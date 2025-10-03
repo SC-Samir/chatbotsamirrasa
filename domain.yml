@@ -1,0 +1,38 @@
+version: "3.1"
+
+intents:
+  - deploy
+  - create_and_deploy
+  - show_context
+  - get_logs
+  - restart
+  - scale
+  - delete_app
+  - rename_app
+  - list_env_vars
+  - add_env_var
+
+entities:
+  - app_name
+  - region
+  - github_repo
+  - git_ref
+  - filter
+  - n
+  - scope
+  - container_name
+  - container_amount
+  - container_size
+  - new_name
+  - aliases
+  - variable_name
+  - variable_value
+responses:
+  utter_greet:
+  - text: "Hello! I am the ScalingoOps agent. What can I do for you?"
+
+actions: []
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true

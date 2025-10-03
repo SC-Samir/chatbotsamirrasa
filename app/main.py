@@ -1,0 +1,203 @@
+import asyncio
+import json
+import httpx
+from fastapi import FastAPI, WebSocket, Request, HTTPException
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import StreamingResponse
+from rasa.core.agent import Agent
+
+# Imports of new modules
+from app.config import settings
+from app.scalingo_manager import ScalingoManager
+from app.services.logs_service import LogsService
+from app.handlers.websocket_handler import WebSocketHandler
+from app.handlers.intent_handlers import IntentHandlerManager
+from app.models import LogsRequest, Region
+from app.core.container import container
+from app.core.logging import StructuredLogger
+from app.middleware.error_handler import ErrorHandlerMiddleware
+from app.middleware.logging_middleware import LoggingMiddleware
+from app.exceptions import LogsServiceError
+from pydantic import ValidationError
+
+# Logger for initialization
+logger = StructuredLogger("main")
+
+# Create FastAPI application
+app = FastAPI(
+    title=settings.app_name,
+    description="Intelligent agent for managing Scalingo deployments and logs",
+    version="2.0.0"
+)
+
+# Add middlewares
+app.add_middleware(ErrorHandlerMiddleware)
+app.add_middleware(LoggingMiddleware)
+
+templates = Jinja2Templates(directory="templates")
+
+# Initialize components with dependency injection
+agent = Agent()
+agent.load_model(settings.rasa_model_path)
+
+scalingo = ScalingoManager()
+logs_service = LogsService(scalingo)
+intent_handler_manager = IntentHandlerManager(scalingo, logs_service)
+websocket_handler = WebSocketHandler(agent, intent_handler_manager)
+
+# Register in dependency container
+container.register_singleton(ScalingoManager, scalingo)
+container.register_singleton(LogsService, logs_service)
+container.register_singleton(IntentHandlerManager, intent_handler_manager)
+container.register_singleton(WebSocketHandler, websocket_handler)
+
+logger.info("Application initialized", 
+           app_name=settings.app_name,
+           debug_mode=settings.debug,
+           redis_url=settings.redis_url)
+
+@app.get("/")
+def get_home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/logs/{app_name}")
+async def get_app_logs(app_name: str, region: str, n: int = 100, filter: str = None, stream: bool = False):
+    """Get logs for a specific application."""
+    try:
+        logs_request = LogsRequest(
+            app_name=app_name,
+            region=Region(region),
+            n=n,
+            filter_param=filter,
+            stream=stream
+        )
+        
+        logs_response = await logs_service.get_logs_info(logs_request)
+        
+        if not logs_response:
+            raise LogsServiceError(
+                f"Unable to retrieve logs for {app_name}",
+                app_name=app_name
+            )
+        
+        if stream:
+            return {
+                "logs_url": logs_response.logs_url,
+                "stream": True,
+                "app_name": app_name,
+                "region": region,
+                "parameters": logs_response.parameters
+            }
+        else:
+            # For non-streaming, fetch the actual logs
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(logs_response.logs_url)
+                response.raise_for_status()
+                
+                logs_content = response.text
+                log_lines = logs_content.strip().split('\n') if logs_content.strip() else []
+                
+                return {
+                    "logs": logs_content,
+                    "log_lines": log_lines,
+                    "total_lines": len(log_lines),
+                    "stream": False,
+                    "app_name": app_name,
+                    "region": region,
+                    "parameters": logs_response.parameters
+                }
+                
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid data: {str(e)}")
+    except Exception as e:
+        logger.error("Error retrieving logs", 
+                    app_name=app_name, 
+                    region=region, 
+                    error=str(e))
+        raise LogsServiceError(
+            f"Error retrieving logs: {str(e)}",
+            app_name=app_name
+        )
+
+@app.get("/logs/{app_name}/stream")
+async def stream_app_logs(app_name: str, region: str, filter: str = None):
+    """Stream logs for a specific application using Server-Sent Events (SSE)."""
+    try:
+        logs_request = LogsRequest(
+            app_name=app_name,
+            region=Region(region),
+            stream=True,
+            filter_param=filter
+        )
+        
+        logs_response = await logs_service.get_logs_info(logs_request)
+        
+        if not logs_response:
+            raise HTTPException(status_code=404, detail=f"Unable to retrieve logs for {app_name}")
+        
+        async def generate_logs():
+            async with httpx.AsyncClient() as client:
+                async with client.stream("GET", logs_response.logs_url) as response:
+                    async for line in response.aiter_lines():
+                        if line.strip():
+                            yield f"data: {json.dumps({'log': line})}\n\n"
+        
+        return StreamingResponse(
+            generate_logs(),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Content-Type": "text/event-stream"
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error streaming logs: {str(e)}")
+
+@app.get("/logs/{app_name}/display")
+async def display_app_logs(app_name: str, region: str, n: int = 100, filter: str = None):
+    """Display logs for a specific application in a readable format."""
+    try:
+        logs_request = LogsRequest(
+            app_name=app_name,
+            region=Region(region),
+            n=n,
+            filter_param=filter,
+            stream=False
+        )
+        
+        logs_response = await logs_service.get_logs_info(logs_request)
+        
+        if not logs_response:
+            raise HTTPException(status_code=404, detail=f"Unable to retrieve logs for {app_name}")
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(logs_response.logs_url)
+            response.raise_for_status()
+            
+            logs_content = response.text
+            
+            if not logs_content.strip():
+                return {"message": "No logs found for this application.", "logs": ""}
+            
+            log_lines = logs_content.strip().split('\n')
+            
+            return {
+                "app_name": app_name,
+                "region": region,
+                "total_lines": len(log_lines),
+                "filter": filter,
+                "logs": logs_content,
+                "logs_preview": log_lines[-10:] if len(log_lines) > 10 else log_lines
+            }
+                
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving logs: {str(e)}")
+
+# Log management functions have been moved to LogsService
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Main WebSocket endpoint."""
+    await websocket_handler.handle_connection(websocket)

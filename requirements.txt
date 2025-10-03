@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+gunicorn
+websockets
+jinja2
+celery
+redis
+rasa
+httpx
+python-dotenv

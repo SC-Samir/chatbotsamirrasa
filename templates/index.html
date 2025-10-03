@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ScalingoOps Agent</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; background-color: #f8f9fa; }
+        #messages { list-style-type: none; margin: 0; padding: 20px; overflow-y: scroll; flex-grow: 1; display: flex; flex-direction: column; }
+        #messages li { padding: 10px 15px; margin-bottom: 10px; border-radius: 18px; line-height: 1.4; max-width: 75%; word-wrap: break-word; }
+        .user { background-color: #007bff; color: white; align-self: flex-end; margin-left: auto; }
+        .bot { background-color: #e9ecef; color: #343a40; align-self: flex-start; }
+        #form { display: flex; padding: 10px; border-top: 1px solid #dee2e6; background-color: #fff; }
+        #input { border: 1px solid #ced4da; padding: 10px; font-size: 16px; flex-grow: 1; border-radius: 20px; outline: none; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 20px; margin-left: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <ul id="messages"></ul>
+    <form id="form" action="" onsubmit="sendMessage(event)">
+        <input id="input" autocomplete="off" placeholder="Envoyez un message..." /><button>Envoyer</button>
+    </form>
+    <script>
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+        const messages = document.getElementById('messages');
+
+        ws.onmessage = function(event) {
+            const li = document.createElement('li');
+            li.className = 'bot';
+            li.textContent = event.data;
+            messages.appendChild(li);
+            messages.scrollTop = messages.scrollHeight;
+        };
+
+        function sendMessage(event) {
+            event.preventDefault();
+            const input = document.getElementById('input');
+            if (input.value) {
+                const li = document.createElement('li');
+                li.className = 'user';
+                li.textContent = input.value;
+                messages.appendChild(li);
+                messages.scrollTop = messages.scrollHeight;
+                
+                ws.send(input.value);
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>

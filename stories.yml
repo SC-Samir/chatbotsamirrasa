@@ -1,0 +1,50 @@
+version: "3.1"
+
+stories:
+- story: deploy story
+  steps:
+  - intent: deploy
+    entities:
+    - app_name: "mon-app-staging"
+    - region: "osc-fr1"
+    - github_repo: "https://github.com/Scalingo/sample-go-martini"
+    - git_ref: "main"
+  - action: utter_greet
+
+- story: create and deploy story
+  steps:
+  - intent: create_and_deploy
+    entities:
+    - app_name: "mon-app-staging"
+    - region: "osc-fr1"
+    - github_repo: "https://github.com/Scalingo/sample-go-martini"
+    - git_ref: "master"
+  - action: utter_greet
+
+- story: rename app story
+  steps:
+  - intent: rename_app
+    entities:
+    - app_name: "mon-app"
+    - region: "osc-fr1"
+    - new_name: "my-new-app"
+  - action: utter_greet
+
+- story: list environment variables story
+  steps:
+  - intent: list_env_vars
+    entities:
+    - app_name: "mon-app"
+    - region: "osc-fr1"
+    - aliases: "true"
+  - action: utter_greet
+
+- story: add environment variable story
+  steps:
+  - intent: add_env_var
+    entities:
+    - app_name: "mon-app"
+    - region: "osc-fr1"
+    - variable_name: "RAILS_ENV"
+    - variable_value: "production"
+  - action: utter_greet
