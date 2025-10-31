@@ -1,3 +1,8 @@
+# Sources
+--index-url https://pypi.org/simple
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Dépendances principales
 fastapi
 uvicorn
 gunicorn
@@ -5,6 +10,8 @@ websockets
 jinja2
 celery
 redis
-rasa
 httpx
 python-dotenv
+torch==2.8.0+cpu; platform_system == "Linux"
+rasa==3.6.21; platform_system == "Linux"
+
