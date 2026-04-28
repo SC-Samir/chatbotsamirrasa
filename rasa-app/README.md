@@ -10,7 +10,7 @@ Service Rasa indépendant pour l'inférence d'intents.
 ## Lancement local
 
 ```bash
-pip install -r requirements.txt
+uv sync --frozen
 rasa run --enable-api --host 0.0.0.0 --port 5005 --model models/model.tar.gz
 ```
 
