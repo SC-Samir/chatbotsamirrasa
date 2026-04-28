@@ -8,6 +8,9 @@ from fastapi import WebSocket
 from app.scalingo_manager import ScalingoManager
 from app.models import LogsRequest, LogsResponse, Region
 from app.config import settings
+from app.core.logging import StructuredLogger
+
+logger = StructuredLogger("logs_service")
 
 
 class LogsService:
@@ -48,8 +51,7 @@ class LogsService:
             if not self._validate_logs_url(logs_url):
                 await websocket.send_text("❌ URL des logs invalide.")
                 return
-                
-            print(f"🔍 Récupération des logs depuis: {logs_url} (stream: {stream_mode})")
+            logger.info("Fetching logs", logs_url=logs_url, stream_mode=stream_mode)
             
             if stream_mode:
                 await self._handle_streaming_logs(websocket, logs_url)
@@ -71,7 +73,7 @@ class LogsService:
         """Gère le streaming des logs."""
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("GET", logs_url) as response:
-                print(f"📊 Status code: {response.status_code}")
+                logger.debug("Streaming logs response", status_code=response.status_code)
                 response.raise_for_status()
                 
                 await websocket.send_text("✅ Connexion établie. Streaming des logs en temps réel...")
@@ -93,7 +95,7 @@ class LogsService:
         """Gère les logs statiques."""
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(logs_url)
-            print(f"📊 Status code: {response.status_code}")
+            logger.debug("Static logs response", status_code=response.status_code)
             response.raise_for_status()
         
         logs_content = response.text
@@ -128,7 +130,7 @@ class LogsService:
                 return
                 
             await websocket.send_text("🔄 Connexion au stream de logs...")
-            print(f"🔍 Streaming des logs depuis: {logs_url}")
+            logger.info("Streaming logs", logs_url=logs_url)
             
             headers = {
                 "Upgrade": "websocket",
@@ -137,7 +139,7 @@ class LogsService:
             
             async with httpx.AsyncClient(timeout=None) as client:
                 async with client.stream("GET", logs_url, headers=headers) as response:
-                    print(f"📊 Status code: {response.status_code}")
+                    logger.debug("Streaming logs (websocket headers) response", status_code=response.status_code)
                     if response.status_code == 400:
                         await websocket.send_text("⚠️ L'API ne supporte pas le streaming WebSocket pour cette app.")
                         return

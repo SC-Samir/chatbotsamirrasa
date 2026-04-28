@@ -14,6 +14,7 @@ from app.exceptions import (
     ValidationError
 )
 from app.core.logging import StructuredLogger
+from app.domain import DomainValidationError, OperationExecutionError, FailureReason
 
 logger = StructuredLogger("error_middleware")
 
@@ -28,6 +29,42 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         except HTTPException:
             # Les erreurs HTTP de FastAPI sont déjà gérées
             raise
+        except OperationExecutionError as e:
+            error = e.error
+            status_code = error.status_code or 500
+            if error.reason == FailureReason.VALIDATION:
+                status_code = 400
+            elif error.reason == FailureReason.AUTH:
+                status_code = 401
+            elif error.reason == FailureReason.NOT_FOUND:
+                status_code = 404
+            elif error.reason == FailureReason.CONFLICT:
+                status_code = 409
+            elif error.reason == FailureReason.TRANSIENT:
+                status_code = 503
+
+            logger.error(
+                "Operation execution error",
+                url=str(request.url),
+                reason=error.reason.value,
+                status_code=status_code,
+                details=error.details,
+            )
+            return JSONResponse(
+                status_code=status_code,
+                content={
+                    "error": "OperationExecutionError",
+                    "reason": error.reason.value,
+                    "message": error.message,
+                    "details": error.details,
+                },
+            )
+        except DomainValidationError as e:
+            logger.error("Domain validation error", url=str(request.url), message=str(e))
+            return JSONResponse(
+                status_code=400,
+                content={"error": "DomainValidationError", "message": str(e)},
+            )
         except ScalingoAPIError as e:
             logger.error(
                 "Erreur API Scalingo",

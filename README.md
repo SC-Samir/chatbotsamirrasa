@@ -58,19 +58,18 @@ git clone <repository-url>
 cd chatbotsamirrasa
 ```
 
-2. **Créer un environnement virtuel**
+2. **Installer `uv`**
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # Sur Windows: venv\Scripts\activate
+python3 -m pip install uv
 ```
 
-3. **Installer les dépendances**
+3. **Créer l'environnement et synchroniser les dépendances**
 ```bash
-# Installation des dépendances principales
-pip install -r requirements.txt
+# Dépendances applicatives
+uv sync --frozen
 
-# Installation des dépendances de développement (optionnel)
-pip install -r requirements-dev.txt
+# Dépendances de dev/test (optionnel)
+uv sync --frozen --group dev
 ```
 
 ## ⚙️ Configuration
@@ -90,7 +89,7 @@ SCALINGO_API_TOKEN=your_scalingo_api_token_here
 REDIS_URL=redis://localhost:6379/0
 
 # Chemin vers le modèle Rasa (optionnel)
-RASA_MODEL_PATH=models/nlu-20251003-132153-soft-cleat.tar.gz
+RASA_MODEL_PATH=models/model.tar.gz
 
 # Mode debug (optionnel)
 DEBUG=false
@@ -116,7 +115,7 @@ Le modèle Rasa utilise les fichiers suivants :
 1. **Entraîner le modèle NLU uniquement**
 ```bash
 # Entraîner avec les données actuelles
-rasa train nlu --data data/ --config config.yml --out models/
+uv run rasa train nlu --data data/ --config config.yml --out models/ --fixed-model-name model.tar.gz
 
 # Le modèle sera sauvegardé dans models/ avec un nom généré automatiquement
 ```
@@ -124,7 +123,7 @@ rasa train nlu --data data/ --config config.yml --out models/
 2. **Entraîner le modèle complet (NLU + Core)**
 ```bash
 # Entraîner le modèle complet
-rasa train --data data/ --config config.yml --domain domain.yml --out models/
+uv run rasa train --data data/ --config config.yml --domain domain.yml --out models/
 
 # Vérifier les modèles générés
 ls -la models/
@@ -321,23 +320,15 @@ def handle_new_intent(self, tracker: Tracker) -> List[Dict]:
 
 5. **Réentraîner le modèle**
 ```bash
-rasa train --data data/ --config config.yml --domain domain.yml --out models/
+uv run rasa train --data data/ --config config.yml --domain domain.yml --out models/
 ```
 
 ### Commandes utiles
 
 ```bash
-# Formater le code
-black app/ tests/
-isort app/ tests/
-
-# Linter
-flake8 app/ tests/
-mypy app/
-
 # Tests
-pytest tests/ -v
-pytest tests/ --cov=app --cov-report=html
+uv run pytest tests/ -v
+uv run pytest tests/ --cov=app --cov-report=html
 ```
 
 ## 🧪 Tests
@@ -346,16 +337,16 @@ pytest tests/ --cov=app --cov-report=html
 
 ```bash
 # Tous les tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Tests avec couverture
-pytest tests/ --cov=app --cov-report=html --cov-report=term
+uv run pytest tests/ --cov=app --cov-report=html --cov-report=term
 
 # Tests spécifiques
-pytest tests/test_models.py -v
+uv run pytest tests/test_models.py -v
 
 # Tests avec logs détaillés
-pytest tests/ -v -s --log-cli-level=DEBUG
+uv run pytest tests/ -v -s --log-cli-level=DEBUG
 ```
 
 ### Structure des tests
@@ -394,18 +385,18 @@ git push scalingo main
 
 ### Déploiement avec Docker
 
-```dockerfile
-# Dockerfile (à créer si nécessaire)
-FROM python:3.10.12
+```bash
+# 1) Construire les images
+docker compose build
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# 2) Entraîner le modèle Rasa via le Dockerfile dédié
+docker compose --profile train run --rm rasa-train
 
-COPY . .
-EXPOSE 8000
+# 3) Lancer l'application + worker + redis
+docker compose up app worker redis
 
-CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+# 4) Arrêter les services
+docker compose down
 ```
 
 ## 🔍 Monitoring et logs
@@ -446,7 +437,7 @@ sudo systemctl restart redis-server  # Linux
 ls -la models/
 
 # Réentraîner le modèle
-rasa train --data data/ --config config.yml --domain domain.yml --out models/
+uv run rasa train --data data/ --config config.yml --domain domain.yml --out models/
 ```
 
 3. **Erreur de token Scalingo**

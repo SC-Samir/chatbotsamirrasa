@@ -1,47 +1,52 @@
-"""
-Gestionnaire d'intents refactorisé.
-"""
-from typing import Dict, Any
+"""Intent handler manager with injected dependencies."""
 from fastapi import WebSocket
-from app.models import AppContext, IntentResponse
-from app.scalingo_manager import ScalingoManager
-from app.services.logs_service import LogsService
-from app.services.deployment_service import DeploymentService
-from app.services.app_management_service import AppManagementService
-from app.utils.websocket_helpers import WebSocketHelpers
-from app.handlers.deployment_handlers import DeployHandler, CreateAndDeployHandler
-from app.handlers.app_management_handlers import RestartHandler, ScaleHandler, DeleteAppHandler, RenameAppHandler, ListEnvVarsHandler, AddEnvVarHandler
+
+from app.handlers.app_management_handlers import (
+    AddEnvVarHandler,
+    DeleteAppHandler,
+    ListEnvVarsHandler,
+    RenameAppHandler,
+    RestartHandler,
+    ScaleHandler,
+)
+from app.handlers.deployment_handlers import CreateAndDeployHandler, DeployHandler
 from app.handlers.utility_handlers import GetLogsHandler, ShowContextHandler
+from app.models import AppContext, IntentResponse
+from app.presentation.websocket import AppManagementIntentController
+from app.services.deployment_service import DeploymentService
+from app.services.logs_service import LogsService
+from app.utils.websocket_helpers import WebSocketHelpers
 
 
 class IntentHandlerManager:
-    """Gestionnaire d'intents refactorisé."""
-    
-    def __init__(self, scalingo_manager: ScalingoManager, logs_service: LogsService):
-        self.scalingo_manager = scalingo_manager
-        self.logs_service = logs_service
-        
-        # Initialisation des services
-        self.deployment_service = DeploymentService(scalingo_manager)
-        self.app_service = AppManagementService(scalingo_manager)
-        self.websocket_helpers = WebSocketHelpers(scalingo_manager)
-        
-        # Initialisation des handlers
+    """Routes intents to focused handlers."""
+
+    def __init__(
+        self,
+        deployment_service: DeploymentService,
+        logs_service: LogsService,
+        websocket_helpers: WebSocketHelpers,
+        app_management_controller: AppManagementIntentController,
+    ):
         self.handlers = [
-            DeployHandler(self.deployment_service, self.websocket_helpers),
-            CreateAndDeployHandler(self.deployment_service, self.websocket_helpers),
-            GetLogsHandler(logs_service, self.websocket_helpers),
-            ShowContextHandler(self.websocket_helpers),
-            RestartHandler(self.app_service, self.websocket_helpers),
-            ScaleHandler(self.app_service, self.websocket_helpers),
-            DeleteAppHandler(self.app_service, self.websocket_helpers),
-            RenameAppHandler(self.app_service, self.websocket_helpers),
-            ListEnvVarsHandler(self.app_service, self.websocket_helpers),
-            AddEnvVarHandler(self.app_service, self.websocket_helpers),
+            DeployHandler(deployment_service, websocket_helpers),
+            CreateAndDeployHandler(deployment_service, websocket_helpers),
+            GetLogsHandler(logs_service, websocket_helpers),
+            ShowContextHandler(websocket_helpers),
+            RestartHandler(app_management_controller, websocket_helpers),
+            ScaleHandler(app_management_controller, websocket_helpers),
+            DeleteAppHandler(app_management_controller, websocket_helpers),
+            RenameAppHandler(app_management_controller, websocket_helpers),
+            ListEnvVarsHandler(app_management_controller, websocket_helpers),
+            AddEnvVarHandler(app_management_controller, websocket_helpers),
         ]
-    
-    async def handle_intent(self, websocket: WebSocket, intent_response: IntentResponse, context: AppContext):
-        """Traite un intent en utilisant le handler approprié."""
+
+    async def handle_intent(
+        self,
+        websocket: WebSocket,
+        intent_response: IntentResponse,
+        context: AppContext,
+    ):
         for handler in self.handlers:
             result = await handler.handle(websocket, intent_response, context)
             if result:

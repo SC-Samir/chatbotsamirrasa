@@ -2,7 +2,10 @@
 Modèles de données pour l'application.
 """
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, validator, Field
+try:
+    from pydantic.v1 import BaseModel, validator, Field
+except ImportError:  # pragma: no cover
+    from pydantic import BaseModel, validator, Field
 from enum import Enum
 import re
 

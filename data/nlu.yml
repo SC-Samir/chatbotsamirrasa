@@ -9,6 +9,9 @@ nlu:
       - deploy [samirpgvector](app_name) to [osc-fr1](region) with [https://github.com/user/pgvector](github_repo) and branch [main](git_ref)
       - deploy [production-api-v2](app_name) to [osc-secnum-fr1](region) with [https://github.com/company/api](github_repo) and branch [production](git_ref)
       - deploy [microservice-auth](app_name) to [osc-fr1](region) with [https://github.com/org/auth](github_repo) and branch [develop](git_ref)
+      - deploy [scalintestrasa](app_name) on [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
+      - deploy the app [scalintestrasa](app_name) on [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
+      - deploy [scalintestrasa](app_name) to [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
   - intent: create_and_deploy
     examples: |
       - create and deploy [mon-app-staging](app_name) to [osc-fr1](region) with [https://github.com/Scalingo/sample-node-express](github_repo) and branch [main](git_ref)
@@ -21,6 +24,11 @@ nlu:
       - create and deploy [backend-api](app_name) to [osc-fr1](region) with [https://github.com/myorg/backend](github_repo) and branch [staging](git_ref)
       - I want to create and deploy [frontend-app](app_name) on [osc-fr1](region) with [https://github.com/company/frontend](github_repo) and branch [main](git_ref)
       - create and deploy [new-service](app_name) on [osc-secnum-fr1](region) with repo [https://github.com/org/service](github_repo) and branch [production](git_ref)
+      - create and deploy [scalintestrasa](app_name) on [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
+      - create and deploy the app [scalintestrasa](app_name) on [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
+      - create and deploy [scalintestrasa](app_name) to [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
+      - create app [scalintestrasa](app_name) on [osc-fr1](region) and deploy from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
+      - create and deploy app [scalintestrasa](app_name) on [osc-fr1](region) using [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
   - intent: show_context
     examples: |
       - what do you remember?
@@ -219,4 +227,3 @@ nlu:
       - add [TIMEOUT](variable_name) = [30](variable_value) to [webapp2024](app_name)
       - add [CACHE_TTL](variable_name) = [3600](variable_value) to [staging-frontend](app_name)
       - add [WORKER_COUNT](variable_name) = [4](variable_value) to [test-backend-v2](app_name)
-

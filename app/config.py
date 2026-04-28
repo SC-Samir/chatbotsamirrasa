@@ -3,7 +3,10 @@ Configuration centralisée pour l'application.
 """
 import os
 from typing import Dict, Any
-from pydantic import BaseSettings, validator
+try:
+    from pydantic.v1 import BaseSettings, validator
+except ImportError:  # pragma: no cover
+    from pydantic import BaseSettings, validator
 
 
 class Settings(BaseSettings):
@@ -20,7 +23,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     
     # Rasa
-    rasa_model_path: str = "models/nlu-20251003-132153-soft-cleat.tar.gz"
+    rasa_model_path: str = "models/model.tar.gz"
     
     # Application
     app_name: str = "ScalingoOps Agent"

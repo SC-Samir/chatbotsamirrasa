@@ -10,6 +10,9 @@ from rasa.core.agent import Agent
 from app.models import AppContext, IntentResponse
 from app.handlers.intent_handlers import IntentHandlerManager
 from app.config import settings
+from app.core.logging import StructuredLogger
+
+logger = StructuredLogger("websocket_handler")
 
 
 class WebSocketHandler:
@@ -67,7 +70,7 @@ class WebSocketHandler:
                     await websocket.send_text("😕 Command not recognized or incomplete. I need the app name, region and GitHub repo (optional: the git ref).")
                 
         except Exception as e:
-            print(f"WebSocket error: {e}")
+            logger.error("WebSocket error", error=str(e))
         finally:
             if redis_task:
                 redis_task.cancel()
@@ -87,22 +90,30 @@ class WebSocketHandler:
                 if message and message['type'] == 'message':
                     try:
                         data = json.loads(message['data'])
-                        await websocket.send_text(data['message'])
+                        if isinstance(data, dict):
+                            if "type" in data and "deployment_id" in data:
+                                await websocket.send_json(data)
+                            elif "message" in data:
+                                await websocket.send_text(data["message"])
+                            else:
+                                await websocket.send_text(json.dumps(data))
+                        else:
+                            await websocket.send_text(str(data))
                     except json.JSONDecodeError:
                         # Handle case where message data is not JSON
                         await websocket.send_text(str(message['data']))
                     except Exception as e:
-                        print(f"Error sending message to WebSocket: {e}")
+                        logger.error("Error sending Redis message to websocket", error=str(e))
                         break
                         
                 await asyncio.sleep(0.1)  # Small delay to avoid busy waiting
         except asyncio.CancelledError:
-            print(f"Redis Pub/Sub task cancelled for channel: {channel}")
+            logger.info("Redis Pub/Sub task cancelled", channel=channel)
         except Exception as e:
-            print(f"Error Redis Pub/Sub: {e}")
+            logger.error("Redis Pub/Sub error", channel=channel, error=str(e))
         finally:
             try:
                 await asyncio.get_event_loop().run_in_executor(None, pubsub.unsubscribe, channel)
                 await asyncio.get_event_loop().run_in_executor(None, pubsub.close)
             except Exception as e:
-                print(f"Error closing Redis Pub/Sub: {e}")
+                logger.error("Error closing Redis Pub/Sub", channel=channel, error=str(e))
