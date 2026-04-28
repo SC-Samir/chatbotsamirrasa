@@ -1,8 +1,7 @@
 """
 Configuration centralisée pour l'application.
 """
-import os
-from typing import Dict, Any
+from typing import Dict
 try:
     from pydantic.v1 import BaseSettings, validator
 except ImportError:  # pragma: no cover
@@ -22,8 +21,10 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
     
-    # Rasa
-    rasa_model_path: str = "models/model.tar.gz"
+    # Rasa HTTP service
+    rasa_url: str = "http://localhost:5005"
+    rasa_timeout_ms: int = 3000
+    rasa_auth_token: str | None = None
     
     # Application
     app_name: str = "ScalingoOps Agent"

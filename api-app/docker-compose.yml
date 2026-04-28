@@ -5,14 +5,25 @@ services:
     ports:
       - "6379:6379"
 
-  rasa-train:
+  nlu-train:
     build:
-      context: .
-      dockerfile: Dockerfile.rasa-train
-    container_name: scalingoops-rasa-train
+      context: ..
+      dockerfile: api-app/Dockerfile.nlu-train
+    container_name: scalingoops-nlu-train
     profiles: ["train"]
     volumes:
-      - ./models:/app/models
+      - ../nlu-app/models:/app/models
+
+  nlu:
+    build:
+      context: ../nlu-app
+      dockerfile: Dockerfile
+    container_name: scalingoops-nlu
+    environment:
+      NLU_MODEL_PATH: ${NLU_MODEL_PATH:-models/model.joblib}
+      RASA_AUTH_TOKEN: ${RASA_AUTH_TOKEN:-}
+    ports:
+      - "5005:8000"
 
   app:
     build:
@@ -21,15 +32,16 @@ services:
     container_name: scalingoops-app
     depends_on:
       - redis
+      - nlu
     environment:
       SCALINGO_API_TOKEN: ${SCALINGO_API_TOKEN:-}
       REDIS_URL: redis://redis:6379/0
-      RASA_MODEL_PATH: models/model.tar.gz
+      RASA_URL: ${RASA_URL:-http://nlu:8000}
+      RASA_TIMEOUT_MS: ${RASA_TIMEOUT_MS:-3000}
+      RASA_AUTH_TOKEN: ${RASA_AUTH_TOKEN:-}
       DEBUG: ${DEBUG:-false}
     ports:
       - "8000:8000"
-    volumes:
-      - ./models:/app/models
     command: ["uv", "run", "--no-project", "gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
 
   worker:
@@ -39,11 +51,12 @@ services:
     container_name: scalingoops-worker
     depends_on:
       - redis
+      - nlu
     environment:
       SCALINGO_API_TOKEN: ${SCALINGO_API_TOKEN:-}
       REDIS_URL: redis://redis:6379/0
-      RASA_MODEL_PATH: models/model.tar.gz
+      RASA_URL: ${RASA_URL:-http://nlu:8000}
+      RASA_TIMEOUT_MS: ${RASA_TIMEOUT_MS:-3000}
+      RASA_AUTH_TOKEN: ${RASA_AUTH_TOKEN:-}
       DEBUG: ${DEBUG:-false}
-    volumes:
-      - ./models:/app/models
     command: ["uv", "run", "--no-project", "celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info"]

@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.env.*
+.pytest_cache/
+.venv/
+venv/
+tests/
+requirements-dev.txt
+docker-compose.yml
+Dockerfile.app
+Dockerfile.rasa-train
+Makefile
+models/nlu-20251003-132153-soft-cleat.tar.gz

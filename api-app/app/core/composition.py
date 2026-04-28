@@ -1,8 +1,6 @@
 """Application composition root."""
 from dataclasses import dataclass
 
-from rasa.core.agent import Agent
-
 from app.application import AddEnvVar, DeleteApp, ListEnvVars, RenameApp, RestartApp, ScaleApp
 from app.handlers.intent_handlers import IntentHandlerManager
 from app.handlers.websocket_handler import WebSocketHandler
@@ -11,12 +9,13 @@ from app.services.deployment_service import DeploymentService
 from app.services.logs_service import LogsService
 from app.presentation.websocket import AppManagementIntentController, WebSocketPresenter
 from app.config import settings
+from app.infrastructure.rasa import RasaClient
 from app.utils.websocket_helpers import WebSocketHelpers
 
 
 @dataclass(frozen=True)
 class AppComponents:
-    agent: Agent
+    rasa_client: RasaClient
     scalingo_manager: ScalingoManager
     logs_service: LogsService
     deployment_service: DeploymentService
@@ -25,8 +24,11 @@ class AppComponents:
 
 
 def build_components() -> AppComponents:
-    agent = Agent()
-    agent.load_model(settings.rasa_model_path)
+    rasa_client = RasaClient(
+        base_url=settings.rasa_url,
+        timeout_ms=settings.rasa_timeout_ms,
+        auth_token=settings.rasa_auth_token,
+    )
 
     scalingo_manager = ScalingoManager()
 
@@ -51,10 +53,10 @@ def build_components() -> AppComponents:
         websocket_helpers=websocket_helpers,
         app_management_controller=app_management_controller,
     )
-    websocket_handler = WebSocketHandler(agent, intent_handler_manager)
+    websocket_handler = WebSocketHandler(rasa_client, intent_handler_manager)
 
     return AppComponents(
-        agent=agent,
+        rasa_client=rasa_client,
         scalingo_manager=scalingo_manager,
         logs_service=logs_service,
         deployment_service=deployment_service,

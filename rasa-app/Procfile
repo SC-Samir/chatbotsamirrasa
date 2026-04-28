@@ -1,0 +1,1 @@
+web: rasa run --enable-api --host 0.0.0.0 --port ${PORT} ${RASA_AUTH_TOKEN:+--auth-token ${RASA_AUTH_TOKEN}} --model ${RASA_MODEL_PATH:-models/model.tar.gz}

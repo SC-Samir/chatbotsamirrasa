@@ -179,3 +179,8 @@ async def display_app_logs(app_name: str, region: str, n: int = 100, filter: str
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await components.websocket_handler.handle_connection(websocket)
+
+
+@app.websocket("/ws/")
+async def websocket_endpoint_slash(websocket: WebSocket):
+    await components.websocket_handler.handle_connection(websocket)

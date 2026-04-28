@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ScalingoOps Agent</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ["Sora", "Manrope", "Avenir Next", "Segoe UI", "sans-serif"]
+                    },
+                    keyframes: {
+                        floatSlow: {
+                            "0%,100%": { transform: "translate3d(0,0,0)" },
+                            "50%": { transform: "translate3d(0,-8px,0)" }
+                        },
+                        fadeSlide: {
+                            "0%": { opacity: "0", transform: "translate3d(0,10px,0)" },
+                            "100%": { opacity: "1", transform: "translate3d(0,0,0)" }
+                        },
+                        softPulse: {
+                            "0%,100%": { opacity: "1" },
+                            "50%": { opacity: ".7" }
+                        },
+                        scan: {
+                            "0%": { backgroundPosition: "180% 0" },
+                            "100%": { backgroundPosition: "-180% 0" }
+                        }
+                    },
+                    animation: {
+                        floatSlow: "floatSlow 8s ease-in-out infinite",
+                        fadeSlide: "fadeSlide 260ms cubic-bezier(.22,.61,.36,1)",
+                        softPulse: "softPulse 1.4s ease-in-out infinite",
+                        scan: "scan 2s linear infinite"
+                    },
+                    boxShadow: {
+                        neon: "0 0 0 1px rgba(125,211,252,.25),0 12px 32px rgba(14,116,144,.22)",
+                        card: "0 12px 30px rgba(2,6,23,.28)"
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .bg-mesh {
+            background:
+                radial-gradient(1200px 520px at 8% -10%, rgba(16, 185, 129, 0.18), transparent 55%),
+                radial-gradient(900px 420px at 92% 0%, rgba(56, 189, 248, 0.2), transparent 58%),
+                linear-gradient(135deg, #020617 0%, #0b1733 50%, #0f2d59 100%);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .motion-safe\:animate-fadeSlide,
+            .motion-safe\:animate-floatSlow,
+            .motion-safe\:animate-softPulse,
+            .motion-safe\:animate-scan,
+            .animate-spin,
+            .animate-bounce,
+            .animate-pulse {
+                animation: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
+    <div class="bg-mesh fixed inset-0"></div>
+
+    <div class="pointer-events-none fixed -left-24 top-10 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl motion-safe:animate-floatSlow"></div>
+    <div class="pointer-events-none fixed -right-24 bottom-8 h-80 w-80 rounded-full bg-sky-300/20 blur-3xl motion-safe:animate-floatSlow"></div>
+
+    <main class="relative z-10 mx-auto flex h-full w-full max-w-6xl flex-col gap-3 p-3 sm:gap-4 sm:p-5">
+        <header class="rounded-3xl border border-white/15 bg-slate-900/45 p-4 shadow-card backdrop-blur-xl sm:p-5">
+            <div class="flex items-center gap-3">
+                <span class="h-3 w-3 rounded-full bg-gradient-to-br from-sky-300 to-emerald-300 shadow-[0_0_14px_rgba(56,189,248,.9)] animate-pulse"></span>
+                <h1 class="text-lg font-extrabold tracking-tight sm:text-3xl">ScalingoOps Live Console</h1>
+            </div>
+            <p class="mt-1 text-xs text-slate-300 sm:text-sm">Rapide, lisible, demo-ready: pilotage des apps avec feedback temps reel.</p>
+        </header>
+
+        <ul id="messages" class="flex flex-1 flex-col gap-3 overflow-y-auto rounded-3xl border border-white/15 bg-slate-900/35 p-3 shadow-card backdrop-blur-md sm:p-4"></ul>
+
+        <form id="form" action="" onsubmit="sendMessage(event)" class="grid grid-cols-[1fr_auto] gap-2 sm:gap-3">
+            <input
+                id="input"
+                autocomplete="off"
+                placeholder="Ecris ton action (deploy, logs, context...)"
+                class="w-full rounded-2xl border border-white/20 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-400/20 sm:text-base"
+            />
+            <button class="rounded-2xl bg-gradient-to-r from-sky-300 to-emerald-300 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-neon transition-transform hover:-translate-y-0.5 active:translate-y-0 sm:text-base">
+                Envoyer
+            </button>
+        </form>
+    </main>
+
+    <script>
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+        const messages = document.getElementById('messages');
+        const deploymentCards = new Map();
+        const deploymentTimers = new Map();
+
+        const statusOrder = ["queued", "building", "pushing", "starting", "success"];
+        const statusProgress = { queued: 10, building: 45, pushing: 70, starting: 90, success: 100 };
+
+        ws.onmessage = function(event) {
+            let data = null;
+            try {
+                data = JSON.parse(event.data);
+            } catch (err) {
+                data = null;
+            }
+
+            if (data && data.type && data.deployment_id) {
+                handleDeploymentEvent(data);
+                return;
+            }
+
+            appendMessage("bot", event.data);
+        };
+
+        function classifyBotMessage(text) {
+            const lower = (text || "").toLowerCase();
+            if (lower.includes("log") || lower.includes("tail")) return "logs";
+            if (lower.includes("context") || lower.includes("analyse") || lower.includes("analysis")) return "context";
+            if (lower.includes("deploy") || lower.includes("building") || lower.includes("starting")) return "deploy";
+            return "default";
+        }
+
+        function appendMessage(kind, text) {
+            const li = document.createElement('li');
+            li.className = "motion-safe:animate-fadeSlide max-w-[92%] rounded-2xl border px-4 py-3 text-sm leading-relaxed sm:max-w-[80%] sm:text-[15px]";
+
+            if (kind === "user") {
+                li.classList.add(
+                    "ml-auto",
+                    "border-white/50",
+                    "bg-gradient-to-br",
+                    "from-sky-200",
+                    "to-emerald-200",
+                    "text-slate-900",
+                    "shadow-lg",
+                    "shadow-emerald-400/20"
+                );
+            } else {
+                li.classList.add("bg-slate-900/55", "text-slate-100");
+                const intent = classifyBotMessage(text);
+
+                if (intent === "logs") {
+                    li.classList.add("border-emerald-300/40", "motion-safe:animate-scan");
+                    li.style.backgroundImage = "linear-gradient(120deg, rgba(2,6,23,.84) 25%, rgba(16,185,129,.16) 50%, rgba(2,6,23,.84) 75%)";
+                    li.style.backgroundSize = "220% 100%";
+                } else if (intent === "context") {
+                    li.classList.add("border-sky-300/45", "motion-safe:animate-softPulse");
+                } else if (intent === "deploy") {
+                    li.classList.add("border-cyan-300/45", "shadow-neon");
+                } else {
+                    li.classList.add("border-white/20");
+                }
+            }
+
+            li.textContent = text;
+            messages.appendChild(li);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function createDeploymentCard(data) {
+            const id = data.deployment_id;
+            if (deploymentCards.has(id)) return deploymentCards.get(id);
+
+            const li = document.createElement("li");
+            li.className = "motion-safe:animate-fadeSlide w-full max-w-[96%] rounded-2xl border border-sky-200/30 bg-gradient-to-br from-sky-950/80 to-blue-900/50 p-4 shadow-card sm:max-w-[84%]";
+            li.dataset.deploymentId = id;
+
+            const appName = data.app_name || id;
+            li.innerHTML = `
+                <div class="mb-2 flex items-center justify-between gap-3 text-sm">
+                    <div class="font-bold tracking-wide text-sky-100">Deployment ${appName}</div>
+                    <div class="text-xs text-sky-200/85" data-role="elapsed">00:00</div>
+                </div>
+                <div class="mb-3 h-2.5 overflow-hidden rounded-full bg-white/15">
+                    <div class="h-full w-0 bg-gradient-to-r from-sky-300 to-emerald-300 transition-all duration-300" data-role="bar"></div>
+                </div>
+                <div class="mb-2 grid grid-cols-5 gap-1.5 text-[10px] text-sky-100/80 sm:text-[11px]" data-role="steps">
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="queued">Queued</div>
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="building">Build</div>
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="pushing">Push</div>
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="starting">Start</div>
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="success">Done</div>
+                </div>
+                <div class="flex items-center justify-between gap-2 text-xs sm:text-sm">
+                    <div class="min-w-0 flex items-center gap-2">
+                        <span class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-200/40 border-t-cyan-200" data-role="spinner"></span>
+                        <span class="animate-bounce" data-role="guy">🧍</span>
+                        <span class="max-w-[200px] truncate text-slate-100 sm:max-w-[420px]" data-role="statusText">Deployment started...</span>
+                    </div>
+                    <div class="text-sky-100/85" data-role="progressText">0%</div>
+                </div>
+            `;
+
+            messages.appendChild(li);
+            messages.scrollTop = messages.scrollHeight;
+            deploymentCards.set(id, li);
+
+            const startedAt = Date.now();
+            const timer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+                const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+                const ss = String(elapsed % 60).padStart(2, "0");
+                li.querySelector('[data-role="elapsed"]').textContent = `${mm}:${ss}`;
+            }, 1000);
+            deploymentTimers.set(id, timer);
+            return li;
+        }
+
+        function normalizeProgress(data) {
+            if (typeof data.progress === "number") return data.progress;
+            if (statusProgress[data.status] !== undefined) return statusProgress[data.status];
+            return 0;
+        }
+
+        function markSteps(card, status, final, isError) {
+            const steps = card.querySelectorAll(".step");
+            const idx = statusOrder.indexOf(status);
+
+            steps.forEach((stepEl) => {
+                const step = stepEl.dataset.step;
+                const stepIdx = statusOrder.indexOf(step);
+                stepEl.className = "step rounded-full bg-white/10 px-1 py-1 text-center";
+
+                if (idx >= 0 && stepIdx < idx) stepEl.classList.add("bg-emerald-300", "font-extrabold", "text-slate-900");
+                if (!final && step === status) stepEl.classList.add("bg-sky-300/35", "font-bold", "text-white");
+                if (final && !isError && step === "success") stepEl.classList.add("bg-emerald-300", "font-extrabold", "text-slate-900");
+                if (final && isError && stepIdx <= Math.max(idx, 3)) stepEl.classList.add("bg-amber-300", "font-bold", "text-slate-900");
+            });
+        }
+
+        function finalizeCard(id, card, text, progress, isError) {
+            card.querySelector('[data-role="bar"]').style.width = `${progress}%`;
+            card.querySelector('[data-role="progressText"]').textContent = `${progress}%`;
+            card.querySelector('[data-role="statusText"]').textContent = text;
+            card.querySelector('[data-role="spinner"]').classList.add("hidden");
+            card.querySelector('[data-role="guy"]').textContent = isError ? "⚠️" : "✅";
+            const timer = deploymentTimers.get(id);
+            if (timer) {
+                clearInterval(timer);
+                deploymentTimers.delete(id);
+            }
+        }
+
+        function handleDeploymentEvent(data) {
+            const id = data.deployment_id;
+            const card = createDeploymentCard(data);
+            const isError = Boolean(data.error_kind) || (data.final && data.status !== "success");
+            const text = data.phase_label || data.message || data.status || "In progress";
+            const progress = normalizeProgress(data);
+            const final = Boolean(data.final) || data.type === "deployment_finished";
+
+            card.querySelector('[data-role="bar"]').style.width = `${progress}%`;
+            card.querySelector('[data-role="progressText"]').textContent = `${progress}%`;
+            card.querySelector('[data-role="statusText"]').textContent = text;
+            markSteps(card, data.status, final, isError);
+
+            if (final) {
+                finalizeCard(id, card, text, progress, isError);
+                appendMessage("bot", isError ? `❌ Deployment failed for ${data.app_name || id}.` : `✅ Deployment successful for ${data.app_name || id}.`);
+            } else if (data.type === "deployment_started") {
+                appendMessage("bot", `🚀 Deployment launched for ${data.app_name || id}.`);
+            }
+        }
+
+        function sendMessage(event) {
+            event.preventDefault();
+            const input = document.getElementById('input');
+            if (input.value) {
+                appendMessage("user", input.value);
+                ws.send(input.value);
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>
