@@ -116,6 +116,17 @@ class NLUModel:
         for ent in doc.ents:
             add_entity(ent.label_, ent.text)
 
+        # Prefer exact app-name matches from training values when present.
+        known_app_names = self.known_values.get("app_name", [])
+        low_text = text.lower()
+        for known_name in known_app_names:
+            candidate = known_name.strip()
+            if not candidate:
+                continue
+            if candidate.lower() in low_text:
+                add_entity("app_name", candidate)
+                break
+
         tokens = text.split()
         if "app" in text.lower() and not any(e["entity"] == "app_name" for e in extracted):
             candidates = [tok.strip(".,;:()[]{}\"") for tok in tokens]
