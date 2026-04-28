@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Tuple
 import joblib
 import spacy
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import FeatureUnion
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
@@ -20,6 +21,8 @@ LINES_RE = re.compile(r"\b(\d{1,5})\s+lines\b", re.IGNORECASE)
 FILTER_RE = re.compile(r"\b(?:with|filtered by)\s+([a-zA-Z0-9_-]+)\b", re.IGNORECASE)
 CONTAINER_RE = re.compile(r"\b(web|worker)(?:-\d+)?\b", re.IGNORECASE)
 CONTAINER_SIZE_RE = re.compile(r"\b(XXS|XS|S|M|L|XL|2XL)\b", re.IGNORECASE)
+RENAME_RE = re.compile(r"\brename\s+[a-z0-9][a-z0-9-]{2,29}\s+to\s+([a-z0-9][a-z0-9-]{2,29})\b", re.IGNORECASE)
+KEY_VALUE_RE = re.compile(r"\b([A-Z][A-Z0-9_]*)\s*=\s*([^\s,;]+)")
 CREATE_DEPLOY_APP_RE = re.compile(
     r"\b(?:create(?:\s+and)?\s+deploy|deploy)\s+([a-z0-9][a-z0-9-]{2,29})\b",
     re.IGNORECASE,
@@ -31,6 +34,12 @@ class NLUModel:
         self.pipeline = pipeline
         self.known_values = known_values
         self.intent_keywords = intent_keywords
+        self._intent_keyword_patterns = {
+            intent: [re.compile(rf"\b{re.escape(keyword)}\b", re.IGNORECASE) for keyword in keywords if keyword.strip()]
+            for intent, keywords in intent_keywords.items()
+        }
+        known_app_names = [name.strip() for name in known_values.get("app_name", []) if name.strip()]
+        self._known_app_names = known_app_names
         self._nlp = spacy.blank("en")
         self._ruler = self._nlp.add_pipe("entity_ruler", config={"overwrite_ents": True})
         patterns = []
@@ -63,8 +72,8 @@ class NLUModel:
 
         low = text.lower()
         heuristics: List[Tuple[str, float]] = []
-        for intent_name, keywords in self.intent_keywords.items():
-            score = sum(1 for kw in keywords if kw in low)
+        for intent_name, patterns in self._intent_keyword_patterns.items():
+            score = sum(1 for pattern in patterns if pattern.search(low))
             if score > 0:
                 heuristics.append((intent_name, min(0.95, 0.35 + 0.2 * score)))
 
@@ -116,18 +125,25 @@ class NLUModel:
         if size_match:
             add_entity("container_size", size_match.group(1).upper())
 
+        rename_match = RENAME_RE.search(text)
+        if rename_match:
+            add_entity("new_name", rename_match.group(1).lower())
+
+        for match in KEY_VALUE_RE.finditer(text):
+            add_entity("variable_name", match.group(1))
+            add_entity("variable_value", match.group(2))
+
         doc = self._nlp(text)
         for ent in doc.ents:
             add_entity(ent.label_, ent.text)
 
         # Prefer exact app-name matches from training values when present.
-        known_app_names = self.known_values.get("app_name", [])
         low_text = text.lower()
-        for known_name in known_app_names:
+        for known_name in self._known_app_names:
             candidate = known_name.strip()
             if not candidate:
                 continue
-            if candidate.lower() in low_text:
+            if re.search(rf"\b{re.escape(candidate.lower())}\b", low_text):
                 add_entity("app_name", candidate)
                 break
 
@@ -156,7 +172,15 @@ def train_model(samples: List[Tuple[str, str]], known_values: Dict[str, List[str
     intents = [item[1] for item in samples]
     pipeline = Pipeline(
         [
-            ("vectorizer", TfidfVectorizer(ngram_range=(1, 2), lowercase=True)),
+            (
+                "vectorizer",
+                FeatureUnion(
+                    [
+                        ("word", TfidfVectorizer(ngram_range=(1, 2), lowercase=True)),
+                        ("char", TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), lowercase=True)),
+                    ]
+                ),
+            ),
             ("classifier", LogisticRegression(max_iter=1000, class_weight="balanced")),
         ]
     )

@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.nlu import convert_rasa_nlu, save_model, train_model
+from app.nlu import convert_rasa_nlu, save_model, train_model, load_model
 
 
 def _build_test_model() -> str:
@@ -59,3 +59,20 @@ def test_parse_endpoint(monkeypatch):
         "create_and_deploy",
     }
     assert any(entity["entity"] == "region" for entity in body["entities"])
+
+
+def test_extracts_rename_target():
+    model_path = _build_test_model()
+    model = load_model(model_path)
+    parsed = model.parse("rename mon-app to my-new-app")
+    entities = parsed["entities"]
+    assert any(e["entity"] == "new_name" and e["value"] == "my-new-app" for e in entities)
+
+
+def test_extracts_env_key_value_pair():
+    model_path = _build_test_model()
+    model = load_model(model_path)
+    parsed = model.parse("set LOG_LEVEL=debug for mon-app")
+    entities = parsed["entities"]
+    assert any(e["entity"] == "variable_name" and e["value"] == "LOG_LEVEL" for e in entities)
+    assert any(e["entity"] == "variable_value" and e["value"] == "debug" for e in entities)
