@@ -14,7 +14,6 @@ dependencies = [
   "redis",
   "httpx",
   "python-dotenv",
-  "torch==2.8.0+cpu; platform_system == 'Linux'",
   "rasa==3.6.21; platform_system == 'Linux'",
 ]
 
@@ -29,14 +28,6 @@ dev = [
 
 [tool.uv]
 environments = ["sys_platform == 'linux'"]
-
-[tool.uv.sources]
-torch = { index = "pytorch-cpu" }
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
 
 [build-system]
 requires = ["hatchling"]
