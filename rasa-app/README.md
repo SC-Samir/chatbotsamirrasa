@@ -1,24 +1,13 @@
-# Rasa App
+# Rasa App (Deprecated)
 
-Service Rasa indépendant pour l'inférence d'intents.
+Ce service est conservé temporairement pour rollback uniquement.
 
-## Variables d'environnement
+Le moteur NLU principal est désormais `nlu-app/` (FastAPI + spaCy + scikit-learn).
 
-- `RASA_MODEL_PATH` (défaut `models/model.tar.gz`)
-- `RASA_AUTH_TOKEN` (optionnel, recommandé)
+## Rollback
 
-## Lancement local
+Si tu dois revenir sur Rasa rapidement:
 
-```bash
-uv sync --frozen
-rasa run --enable-api --host 0.0.0.0 --port 5005 --model models/model.tar.gz
-```
-
-## Procfile (Scalingo)
-
-- `web`: `rasa run --enable-api --host 0.0.0.0 --port $PORT ...`
-
-## Endpoints utiles
-
-- `GET /status`
-- `POST /model/parse`
+- redéploie `rasa-app`
+- mets `RASA_URL` de `chatbotsamir-api` vers l'URL de `chatbotsamir-rasa`
+- redéploie `chatbotsamir-api`
