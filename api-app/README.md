@@ -28,3 +28,4 @@ uv run celery -A app.tasks.celery_app worker --loglevel=info
 
 - `web`: Gunicorn/Uvicorn sur `$PORT`
 - `worker`: Celery
+
