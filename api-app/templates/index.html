@@ -1,126 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
+    <meta charset="UTF-8">
     <title>ScalingoOps Agent</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ["Sora", "Manrope", "Avenir Next", "Segoe UI", "sans-serif"]
+                    },
+                    keyframes: {
+                        floatSlow: {
+                            "0%,100%": { transform: "translate3d(0,0,0)" },
+                            "50%": { transform: "translate3d(0,-8px,0)" }
+                        },
+                        fadeSlide: {
+                            "0%": { opacity: "0", transform: "translate3d(0,10px,0)" },
+                            "100%": { opacity: "1", transform: "translate3d(0,0,0)" }
+                        },
+                        softPulse: {
+                            "0%,100%": { opacity: "1" },
+                            "50%": { opacity: ".7" }
+                        },
+                        scan: {
+                            "0%": { backgroundPosition: "180% 0" },
+                            "100%": { backgroundPosition: "-180% 0" }
+                        }
+                    },
+                    animation: {
+                        floatSlow: "floatSlow 8s ease-in-out infinite",
+                        fadeSlide: "fadeSlide 260ms cubic-bezier(.22,.61,.36,1)",
+                        softPulse: "softPulse 1.4s ease-in-out infinite",
+                        scan: "scan 2s linear infinite"
+                    },
+                    boxShadow: {
+                        neon: "0 0 0 1px rgba(125,211,252,.25),0 12px 32px rgba(14,116,144,.22)",
+                        card: "0 12px 30px rgba(2,6,23,.28)"
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            margin: 0;
-            background-color: #f8f9fa;
+        .bg-mesh {
+            background:
+                radial-gradient(1200px 520px at 8% -10%, rgba(16, 185, 129, 0.18), transparent 55%),
+                radial-gradient(900px 420px at 92% 0%, rgba(56, 189, 248, 0.2), transparent 58%),
+                linear-gradient(135deg, #020617 0%, #0b1733 50%, #0f2d59 100%);
         }
-        #messages {
-            list-style-type: none;
-            margin: 0;
-            padding: 20px;
-            overflow-y: scroll;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+
+        @media (prefers-reduced-motion: reduce) {
+            .motion-safe\:animate-fadeSlide,
+            .motion-safe\:animate-floatSlow,
+            .motion-safe\:animate-softPulse,
+            .motion-safe\:animate-scan,
+            .animate-spin,
+            .animate-bounce,
+            .animate-pulse {
+                animation: none !important;
+            }
         }
-        #messages li {
-            padding: 10px 15px;
-            border-radius: 18px;
-            line-height: 1.4;
-            max-width: 75%;
-            word-wrap: break-word;
-        }
-        .user { background-color: #007bff; color: white; align-self: flex-end; margin-left: auto; }
-        .bot { background-color: #e9ecef; color: #343a40; align-self: flex-start; }
-        .deployment-card {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 14px;
-            padding: 12px;
-            width: min(560px, 90vw);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-        }
-        .deployment-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            gap: 12px;
-            font-size: 14px;
-        }
-        .deployment-title { font-weight: 600; color: #243447; }
-        .deployment-meta { color: #6c757d; font-size: 12px; }
-        .progress-wrap {
-            background: #eef1f5;
-            border-radius: 999px;
-            overflow: hidden;
-            height: 8px;
-            margin: 8px 0 10px;
-        }
-        .progress-bar {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #0d6efd 0%, #32a1ff 100%);
-            transition: width 350ms ease;
-        }
-        .steps {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 4px;
-            font-size: 11px;
-            color: #6c757d;
-            margin-bottom: 8px;
-        }
-        .step { text-align: center; }
-        .step.active { color: #0d6efd; font-weight: 600; }
-        .step.done { color: #198754; font-weight: 600; }
-        .status-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 13px;
-            gap: 12px;
-        }
-        .status-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            min-width: 0;
-        }
-        .status-text {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 330px;
-        }
-        .spinner {
-            width: 12px;
-            height: 12px;
-            border: 2px solid #d0d7df;
-            border-top-color: #0d6efd;
-            border-radius: 50%;
-            animation: spin 0.9s linear infinite;
-            display: inline-block;
-        }
-        .waiting-guy {
-            font-size: 14px;
-            animation: bob 1.2s ease-in-out infinite;
-        }
-        .hidden { display: none; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes bob {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-1px); }
-        }
-        #form { display: flex; padding: 10px; border-top: 1px solid #dee2e6; background-color: #fff; }
-        #input { border: 1px solid #ced4da; padding: 10px; font-size: 16px; flex-grow: 1; border-radius: 20px; outline: none; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 20px; margin-left: 10px; cursor: pointer; }
     </style>
 </head>
-<body>
-    <ul id="messages"></ul>
-    <form id="form" action="" onsubmit="sendMessage(event)">
-        <input id="input" autocomplete="off" placeholder="Envoyez un message..." /><button>Envoyer</button>
-    </form>
+<body class="h-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
+    <div class="bg-mesh fixed inset-0"></div>
+
+    <div class="pointer-events-none fixed -left-24 top-10 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl motion-safe:animate-floatSlow"></div>
+    <div class="pointer-events-none fixed -right-24 bottom-8 h-80 w-80 rounded-full bg-sky-300/20 blur-3xl motion-safe:animate-floatSlow"></div>
+
+    <main class="relative z-10 mx-auto flex h-full w-full max-w-6xl flex-col gap-3 p-3 sm:gap-4 sm:p-5">
+        <header class="rounded-3xl border border-white/15 bg-slate-900/45 p-4 shadow-card backdrop-blur-xl sm:p-5">
+            <div class="flex items-center gap-3">
+                <span class="h-3 w-3 rounded-full bg-gradient-to-br from-sky-300 to-emerald-300 shadow-[0_0_14px_rgba(56,189,248,.9)] animate-pulse"></span>
+                <h1 class="text-lg font-extrabold tracking-tight sm:text-3xl">ScalingoOps Live Console</h1>
+            </div>
+            <p class="mt-1 text-xs text-slate-300 sm:text-sm">Rapide, lisible, demo-ready: pilotage des apps avec feedback temps reel.</p>
+        </header>
+
+        <ul id="messages" class="flex flex-1 flex-col gap-3 overflow-y-auto rounded-3xl border border-white/15 bg-slate-900/35 p-3 shadow-card backdrop-blur-md sm:p-4"></ul>
+
+        <form id="form" action="" onsubmit="sendMessage(event)" class="grid grid-cols-[1fr_auto] gap-2 sm:gap-3">
+            <input
+                id="input"
+                autocomplete="off"
+                placeholder="Ecris ton action (deploy, logs, context...)"
+                class="w-full rounded-2xl border border-white/20 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-400/20 sm:text-base"
+            />
+            <button class="rounded-2xl bg-gradient-to-r from-sky-300 to-emerald-300 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-neon transition-transform hover:-translate-y-0.5 active:translate-y-0 sm:text-base">
+                Envoyer
+            </button>
+        </form>
+    </main>
+
     <script>
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
@@ -147,9 +121,46 @@
             appendMessage("bot", event.data);
         };
 
+        function classifyBotMessage(text) {
+            const lower = (text || "").toLowerCase();
+            if (lower.includes("log") || lower.includes("tail")) return "logs";
+            if (lower.includes("context") || lower.includes("analyse") || lower.includes("analysis")) return "context";
+            if (lower.includes("deploy") || lower.includes("building") || lower.includes("starting")) return "deploy";
+            return "default";
+        }
+
         function appendMessage(kind, text) {
             const li = document.createElement('li');
-            li.className = kind;
+            li.className = "motion-safe:animate-fadeSlide max-w-[92%] rounded-2xl border px-4 py-3 text-sm leading-relaxed sm:max-w-[80%] sm:text-[15px]";
+
+            if (kind === "user") {
+                li.classList.add(
+                    "ml-auto",
+                    "border-white/50",
+                    "bg-gradient-to-br",
+                    "from-sky-200",
+                    "to-emerald-200",
+                    "text-slate-900",
+                    "shadow-lg",
+                    "shadow-emerald-400/20"
+                );
+            } else {
+                li.classList.add("bg-slate-900/55", "text-slate-100");
+                const intent = classifyBotMessage(text);
+
+                if (intent === "logs") {
+                    li.classList.add("border-emerald-300/40", "motion-safe:animate-scan");
+                    li.style.backgroundImage = "linear-gradient(120deg, rgba(2,6,23,.84) 25%, rgba(16,185,129,.16) 50%, rgba(2,6,23,.84) 75%)";
+                    li.style.backgroundSize = "220% 100%";
+                } else if (intent === "context") {
+                    li.classList.add("border-sky-300/45", "motion-safe:animate-softPulse");
+                } else if (intent === "deploy") {
+                    li.classList.add("border-cyan-300/45", "shadow-neon");
+                } else {
+                    li.classList.add("border-white/20");
+                }
+            }
+
             li.textContent = text;
             messages.appendChild(li);
             messages.scrollTop = messages.scrollHeight;
@@ -157,37 +168,35 @@
 
         function createDeploymentCard(data) {
             const id = data.deployment_id;
-            if (deploymentCards.has(id)) {
-                return deploymentCards.get(id);
-            }
+            if (deploymentCards.has(id)) return deploymentCards.get(id);
 
             const li = document.createElement("li");
-            li.className = "bot deployment-card";
+            li.className = "motion-safe:animate-fadeSlide w-full max-w-[96%] rounded-2xl border border-sky-200/30 bg-gradient-to-br from-sky-950/80 to-blue-900/50 p-4 shadow-card sm:max-w-[84%]";
             li.dataset.deploymentId = id;
 
             const appName = data.app_name || id;
             li.innerHTML = `
-                <div class="deployment-head">
-                    <div class="deployment-title">Deployment ${appName}</div>
-                    <div class="deployment-meta" data-role="elapsed">00:00</div>
+                <div class="mb-2 flex items-center justify-between gap-3 text-sm">
+                    <div class="font-bold tracking-wide text-sky-100">Deployment ${appName}</div>
+                    <div class="text-xs text-sky-200/85" data-role="elapsed">00:00</div>
                 </div>
-                <div class="progress-wrap">
-                    <div class="progress-bar" data-role="bar"></div>
+                <div class="mb-3 h-2.5 overflow-hidden rounded-full bg-white/15">
+                    <div class="h-full w-0 bg-gradient-to-r from-sky-300 to-emerald-300 transition-all duration-300" data-role="bar"></div>
                 </div>
-                <div class="steps" data-role="steps">
-                    <div class="step" data-step="queued">Queued</div>
-                    <div class="step" data-step="building">Build</div>
-                    <div class="step" data-step="pushing">Push</div>
-                    <div class="step" data-step="starting">Start</div>
-                    <div class="step" data-step="success">Done</div>
+                <div class="mb-2 grid grid-cols-5 gap-1.5 text-[10px] text-sky-100/80 sm:text-[11px]" data-role="steps">
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="queued">Queued</div>
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="building">Build</div>
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="pushing">Push</div>
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="starting">Start</div>
+                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="success">Done</div>
                 </div>
-                <div class="status-row">
-                    <div class="status-left">
-                        <span class="spinner" data-role="spinner"></span>
-                        <span class="waiting-guy" data-role="guy">🧍</span>
-                        <span class="status-text" data-role="statusText">Deployment started...</span>
+                <div class="flex items-center justify-between gap-2 text-xs sm:text-sm">
+                    <div class="min-w-0 flex items-center gap-2">
+                        <span class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-200/40 border-t-cyan-200" data-role="spinner"></span>
+                        <span class="animate-bounce" data-role="guy">🧍</span>
+                        <span class="max-w-[200px] truncate text-slate-100 sm:max-w-[420px]" data-role="statusText">Deployment started...</span>
                     </div>
-                    <div class="deployment-meta" data-role="progressText">0%</div>
+                    <div class="text-sky-100/85" data-role="progressText">0%</div>
                 </div>
             `;
 
@@ -219,12 +228,12 @@
             steps.forEach((stepEl) => {
                 const step = stepEl.dataset.step;
                 const stepIdx = statusOrder.indexOf(step);
-                stepEl.classList.remove("active", "done");
+                stepEl.className = "step rounded-full bg-white/10 px-1 py-1 text-center";
 
-                if (idx >= 0 && stepIdx < idx) stepEl.classList.add("done");
-                if (!final && step === status) stepEl.classList.add("active");
-                if (final && !isError && step === "success") stepEl.classList.add("done");
-                if (final && isError && stepIdx <= Math.max(idx, 3)) stepEl.classList.add("done");
+                if (idx >= 0 && stepIdx < idx) stepEl.classList.add("bg-emerald-300", "font-extrabold", "text-slate-900");
+                if (!final && step === status) stepEl.classList.add("bg-sky-300/35", "font-bold", "text-white");
+                if (final && !isError && step === "success") stepEl.classList.add("bg-emerald-300", "font-extrabold", "text-slate-900");
+                if (final && isError && stepIdx <= Math.max(idx, 3)) stepEl.classList.add("bg-amber-300", "font-bold", "text-slate-900");
             });
         }
 
