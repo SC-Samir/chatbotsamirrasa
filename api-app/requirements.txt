@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+websockets
+wsproto
+gunicorn
+jinja2
+celery
+redis
+httpx

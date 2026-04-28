@@ -6,8 +6,9 @@ readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
   "fastapi",
-  "uvicorn",
+  "uvicorn[standard]",
   "websockets",
+  "wsproto",
   "gunicorn",
   "jinja2",
   "celery",
