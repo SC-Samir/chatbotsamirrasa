@@ -1,20 +1,17 @@
 [project]
-name = "scalingoops-agent"
+name = "scalingoops-api"
 version = "0.3.0"
-description = "ScalingoOps conversational agent built with FastAPI and Rasa"
+description = "ScalingoOps API and worker"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
   "fastapi",
   "uvicorn",
   "gunicorn",
-  "websockets",
   "jinja2",
   "celery",
   "redis",
   "httpx",
-  "python-dotenv",
-  "rasa==3.6.21; platform_system == 'Linux'",
 ]
 
 [dependency-groups]

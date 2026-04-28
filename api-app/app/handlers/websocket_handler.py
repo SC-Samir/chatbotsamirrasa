@@ -4,13 +4,12 @@ Handler pour la gestion des connexions WebSocket.
 import asyncio
 import json
 import redis
-from typing import Dict, Any, Optional
 from fastapi import WebSocket
-from rasa.core.agent import Agent
 from app.models import AppContext, IntentResponse
 from app.handlers.intent_handlers import IntentHandlerManager
 from app.config import settings
 from app.core.logging import StructuredLogger
+from app.infrastructure.rasa import RasaClient
 
 logger = StructuredLogger("websocket_handler")
 
@@ -18,8 +17,8 @@ logger = StructuredLogger("websocket_handler")
 class WebSocketHandler:
     """Handler for WebSocket connections."""
     
-    def __init__(self, agent: Agent, intent_handler_manager: IntentHandlerManager):
-        self.agent = agent
+    def __init__(self, rasa_client: RasaClient, intent_handler_manager: IntentHandlerManager):
+        self.rasa_client = rasa_client
         self.intent_handler_manager = intent_handler_manager
         self.redis_client = redis.from_url(settings.redis_url)
     
@@ -39,7 +38,7 @@ class WebSocketHandler:
                 data = await websocket.receive_text()
                 
                 # Parser le message avec Rasa
-                interpretation = await self.agent.parse_message(message_data=data)
+                interpretation = await self.rasa_client.parse_message(text=data, retries=1)
                 
                 intent_response = IntentResponse(
                     intent=interpretation["intent"],

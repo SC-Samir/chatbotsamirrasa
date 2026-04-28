@@ -1,0 +1,5 @@
+.DS_Store
+.env
+.env.*
+# Keep only production model
+models/nlu-20251003-132153-soft-cleat.tar.gz
