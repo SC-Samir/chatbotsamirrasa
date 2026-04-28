@@ -20,6 +20,10 @@ LINES_RE = re.compile(r"\b(\d{1,5})\s+lines\b", re.IGNORECASE)
 FILTER_RE = re.compile(r"\b(?:with|filtered by)\s+([a-zA-Z0-9_-]+)\b", re.IGNORECASE)
 CONTAINER_RE = re.compile(r"\b(web|worker)(?:-\d+)?\b", re.IGNORECASE)
 CONTAINER_SIZE_RE = re.compile(r"\b(XXS|XS|S|M|L|XL|2XL)\b", re.IGNORECASE)
+CREATE_DEPLOY_APP_RE = re.compile(
+    r"\b(?:create(?:\s+and)?\s+deploy|deploy)\s+([a-z0-9][a-z0-9-]{2,29})\b",
+    re.IGNORECASE,
+)
 
 
 class NLUModel:
@@ -126,6 +130,13 @@ class NLUModel:
             if candidate.lower() in low_text:
                 add_entity("app_name", candidate)
                 break
+
+        if not any(e["entity"] == "app_name" for e in extracted):
+            m = CREATE_DEPLOY_APP_RE.search(text)
+            if m:
+                candidate = m.group(1).lower()
+                if not candidate.startswith("osc-"):
+                    add_entity("app_name", candidate)
 
         tokens = text.split()
         if "app" in text.lower() and not any(e["entity"] == "app_name" for e in extracted):
