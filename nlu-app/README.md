@@ -1,19 +1,27 @@
-# NLU App (FastAPI + spaCy + scikit-learn)
+# NLU App (FastAPI + Transformers CPU)
 
-Service NLU auto-hébergé, compatible avec le contrat Rasa `POST /model/parse`.
+Service NLU auto-heberge, compatible avec le contrat Rasa `POST /model/parse`.
 
 ## Variables d'environnement
 
-- `NLU_MODEL_PATH` (défaut `models/model.joblib`)
-- `RASA_AUTH_TOKEN` (optionnel, pour compatibilité avec `api-app`)
+- `NLU_MODEL_PATH` (defaut `models`)
+- `RASA_AUTH_TOKEN` (optionnel, pour compatibilite avec `api-app`)
 - `NLU_AUTH_TOKEN` (optionnel, alias de `RASA_AUTH_TOKEN`)
+- `TOKENIZERS_PARALLELISM` (recommande `false` en prod)
+- `OMP_NUM_THREADS`, `MKL_NUM_THREADS`, `OPENBLAS_NUM_THREADS` (recommande `1` en CPU contraint)
 
-## Entraînement
+## Entrainement
 
 ```bash
-uv sync --frozen
-uv run python scripts/train.py --input data.nlu.yml --output models/model.joblib
+uv sync
+uv run python scripts/train.py --input data.nlu.yml --output models --epochs 3 --max-length 128 --base-model prajjwal1/bert-tiny
 ```
+
+Artefacts generes:
+
+- `models/intent/*`
+- `models/ner/*`
+- `models/metadata.json`
 
 ## Lancement local
 
@@ -21,9 +29,19 @@ uv run python scripts/train.py --input data.nlu.yml --output models/model.joblib
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 5005
 ```
 
-## Procfile (Scalingo)
+## Docker
 
-- `web`: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+Build:
+
+```bash
+docker build -t chatbotsamir-nlu .
+```
+
+Run:
+
+```bash
+docker run --rm -p 5005:8000 -e NLU_MODEL_PATH=models chatbotsamir-nlu
+```
 
 ## Endpoints
 
@@ -36,7 +54,7 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 5005
 {"text": "deploy my-app on osc-fr1 from https://github.com/user/repo branch main"}
 ```
 
-### Exemple de réponse
+### Exemple de reponse
 
 ```json
 {
@@ -50,3 +68,8 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 5005
   "text": "deploy my-app on osc-fr1 from https://github.com/user/repo branch main"
 }
 ```
+
+## Notes perf/taille
+
+- Runtime CPU-only avec modeles compacts (`bert-tiny`) pour contenir la RAM et la taille image.
+- Limiter le nombre de threads BLAS/OMP aide a stabiliser la latence en petit plan Scalingo.

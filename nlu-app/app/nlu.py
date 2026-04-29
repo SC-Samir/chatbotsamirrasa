@@ -5,241 +5,144 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import joblib
-import spacy
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.pipeline import FeatureUnion
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
+import yaml
+from transformers import pipeline
 
-URL_RE = re.compile(r"https?://[^\s]+")
-REGION_RE = re.compile(r"\b(osc-fr1|osc-secnum-fr1)\b", re.IGNORECASE)
-APP_NAME_RE = re.compile(r"\b[a-z0-9][a-z0-9-]{2,29}\b")
-BRANCH_RE = re.compile(r"\bbranch\s+([\w./-]+)", re.IGNORECASE)
-TO_NUMBER_RE = re.compile(r"\bto\s+(\d{1,5})\b", re.IGNORECASE)
-LINES_RE = re.compile(r"\b(\d{1,5})\s+lines\b", re.IGNORECASE)
-FILTER_RE = re.compile(r"\b(?:with|filtered by)\s+([a-zA-Z0-9_-]+)\b", re.IGNORECASE)
-CONTAINER_RE = re.compile(r"\b(web|worker)(?:-\d+)?\b", re.IGNORECASE)
-CONTAINER_SIZE_RE = re.compile(r"\b(XXS|XS|S|M|L|XL|2XL)\b", re.IGNORECASE)
-RENAME_RE = re.compile(r"\brename\s+[a-z0-9][a-z0-9-]{2,29}\s+to\s+([a-z0-9][a-z0-9-]{2,29})\b", re.IGNORECASE)
-KEY_VALUE_RE = re.compile(r"\b([A-Z][A-Z0-9_]*)\s*=\s*([^\s,;]+)")
-CREATE_DEPLOY_APP_RE = re.compile(
-    r"\b(?:create(?:\s+and)?\s+deploy|deploy)\s+([a-z0-9][a-z0-9-]{2,29})\b",
-    re.IGNORECASE,
-)
+ANNOTATED_RE = re.compile(r"\[([^\]]+)\]\(([^\)]+)\)")
 
 
 class NLUModel:
-    def __init__(self, pipeline: Pipeline, known_values: Dict[str, List[str]], intent_keywords: Dict[str, List[str]]):
-        self.pipeline = pipeline
-        self.known_values = known_values
-        self.intent_keywords = intent_keywords
-        self._intent_keyword_patterns = {
-            intent: [re.compile(rf"\b{re.escape(keyword)}\b", re.IGNORECASE) for keyword in keywords if keyword.strip()]
-            for intent, keywords in intent_keywords.items()
-        }
-        known_app_names = [name.strip() for name in known_values.get("app_name", []) if name.strip()]
-        self._known_app_names = known_app_names
-        self._nlp = spacy.blank("en")
-        self._ruler = self._nlp.add_pipe("entity_ruler", config={"overwrite_ents": True})
-        patterns = []
-        for entity_name, values in known_values.items():
-            if entity_name in {"app_name", "github_repo", "git_ref", "container_amount", "n", "variable_value"}:
-                continue
-            for value in values[:1000]:
-                if len(value.strip()) < 2:
-                    continue
-                patterns.append({"label": entity_name, "pattern": value})
-        if patterns:
-            self._ruler.add_patterns(patterns)
+    def __init__(
+        self,
+        intent_pipe: Any,
+        ner_pipe: Any,
+        id2intent: Dict[str, str],
+        allowed_entities: List[str],
+    ):
+        self.intent_pipe = intent_pipe
+        self.ner_pipe = ner_pipe
+        self.id2intent = id2intent
+        self.allowed_entities = set(allowed_entities)
 
     def parse(self, text: str) -> Dict[str, Any]:
         normalized = text.strip()
-        intent, confidence = self._predict_intent(normalized)
+        intent_name, confidence = self._predict_intent(normalized)
         entities = self._extract_entities(normalized)
         return {
-            "intent": {"name": intent, "confidence": float(confidence)},
+            "intent": {"name": intent_name, "confidence": float(confidence)},
             "entities": entities,
             "text": text,
         }
 
     def _predict_intent(self, text: str) -> Tuple[str, float]:
-        probs = self.pipeline.predict_proba([text])[0]
-        classes = list(self.pipeline.classes_)
-        best_idx = int(probs.argmax())
-        ml_intent = classes[best_idx]
-        ml_conf = float(probs[best_idx])
-
-        low = text.lower()
-        heuristics: List[Tuple[str, float]] = []
-        for intent_name, patterns in self._intent_keyword_patterns.items():
-            score = sum(1 for pattern in patterns if pattern.search(low))
-            if score > 0:
-                heuristics.append((intent_name, min(0.95, 0.35 + 0.2 * score)))
-
-        if heuristics:
-            heur_intent, heur_conf = sorted(heuristics, key=lambda item: item[1], reverse=True)[0]
-            if heur_conf > ml_conf + 0.12:
-                return heur_intent, heur_conf
-
-        return ml_intent, ml_conf
+        result = self.intent_pipe(text, truncation=True, max_length=128)[0]
+        label = str(result.get("label", ""))
+        intent_name = self.id2intent.get(label, label)
+        return intent_name, float(result.get("score", 0.0))
 
     def _extract_entities(self, text: str) -> List[Dict[str, Any]]:
+        raw_entities = self.ner_pipe(text, aggregation_strategy="simple")
         extracted: List[Dict[str, Any]] = []
         seen: set[tuple[str, str]] = set()
 
-        def add_entity(name: str, value: Any) -> None:
-            as_str = str(value)
-            key = (name, as_str)
-            if key in seen:
-                return
-            seen.add(key)
-            extracted.append({"entity": name, "value": value})
-
-        for match in URL_RE.finditer(text):
-            add_entity("github_repo", match.group(0).rstrip(".,;"))
-
-        for match in REGION_RE.finditer(text):
-            add_entity("region", match.group(1).lower())
-
-        branch_match = BRANCH_RE.search(text)
-        if branch_match:
-            add_entity("git_ref", branch_match.group(1))
-
-        line_match = LINES_RE.search(text)
-        if line_match:
-            add_entity("n", int(line_match.group(1)))
-
-        scale_match = TO_NUMBER_RE.search(text)
-        if scale_match and any(tok in text.lower() for tok in ["scale", "container", "instances"]):
-            add_entity("container_amount", int(scale_match.group(1)))
-
-        filter_match = FILTER_RE.search(text)
-        if filter_match:
-            add_entity("filter_param", filter_match.group(1))
-
-        for match in CONTAINER_RE.finditer(text):
-            add_entity("container_name", match.group(0))
-
-        size_match = CONTAINER_SIZE_RE.search(text)
-        if size_match:
-            add_entity("container_size", size_match.group(1).upper())
-
-        rename_match = RENAME_RE.search(text)
-        if rename_match:
-            add_entity("new_name", rename_match.group(1).lower())
-
-        for match in KEY_VALUE_RE.finditer(text):
-            add_entity("variable_name", match.group(1))
-            add_entity("variable_value", match.group(2))
-
-        doc = self._nlp(text)
-        for ent in doc.ents:
-            add_entity(ent.label_, ent.text)
-
-        # Prefer exact app-name matches from training values when present.
-        low_text = text.lower()
-        for known_name in self._known_app_names:
-            candidate = known_name.strip()
-            if not candidate:
+        for ent in raw_entities:
+            entity_name = str(ent.get("entity_group", "")).strip()
+            value = str(ent.get("word", "")).strip()
+            if not entity_name or not value:
                 continue
-            if re.search(rf"\b{re.escape(candidate.lower())}\b", low_text):
-                add_entity("app_name", candidate)
-                break
-
-        if not any(e["entity"] == "app_name" for e in extracted):
-            m = CREATE_DEPLOY_APP_RE.search(text)
-            if m:
-                candidate = m.group(1).lower()
-                if not candidate.startswith("osc-"):
-                    add_entity("app_name", candidate)
-
-        tokens = text.split()
-        if "app" in text.lower() and not any(e["entity"] == "app_name" for e in extracted):
-            candidates = [tok.strip(".,;:()[]{}\"") for tok in tokens]
-            for candidate in candidates:
-                if APP_NAME_RE.fullmatch(candidate) and candidate.lower() not in {"scale", "deploy", "create", "delete", "restart", "rename"}:
-                    if candidate.lower().startswith("osc-"):
-                        continue
-                    add_entity("app_name", candidate)
-                    break
+            if self.allowed_entities and entity_name not in self.allowed_entities:
+                continue
+            key = (entity_name, value)
+            if key in seen:
+                continue
+            seen.add(key)
+            extracted.append({"entity": entity_name, "value": value})
 
         return extracted
 
 
-def train_model(samples: List[Tuple[str, str]], known_values: Dict[str, List[str]]) -> NLUModel:
-    texts = [item[0] for item in samples]
-    intents = [item[1] for item in samples]
-    pipeline = Pipeline(
-        [
-            (
-                "vectorizer",
-                FeatureUnion(
-                    [
-                        ("word", TfidfVectorizer(ngram_range=(1, 2), lowercase=True)),
-                        ("char", TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), lowercase=True)),
-                    ]
-                ),
-            ),
-            ("classifier", LogisticRegression(max_iter=1000, class_weight="balanced")),
-        ]
-    )
-    pipeline.fit(texts, intents)
+def save_model_artifacts(
+    output_dir: str,
+    intent_model: Any,
+    intent_tokenizer: Any,
+    ner_model: Any,
+    ner_tokenizer: Any,
+    metadata: Dict[str, Any],
+) -> None:
+    base = Path(output_dir)
+    intent_dir = base / "intent"
+    ner_dir = base / "ner"
+    intent_dir.mkdir(parents=True, exist_ok=True)
+    ner_dir.mkdir(parents=True, exist_ok=True)
 
-    intent_keywords = {
-        "deploy": ["deploy"],
-        "create_and_deploy": ["create and deploy", "create app", "setup"],
-        "show_context": ["context", "remember", "memory"],
-        "get_logs": ["logs", "stream"],
-        "restart": ["restart", "relaunch"],
-        "scale": ["scale", "resize", "instances", "containers"],
-        "delete_app": ["delete", "remove", "destroy", "terminate"],
-        "rename_app": ["rename", "change the name", "update"],
-        "list_env_vars": ["environment variables", "env vars", "variables"],
-        "add_env_var": ["add", "set", "create", "variable"],
-    }
-
-    return NLUModel(pipeline=pipeline, known_values=known_values, intent_keywords=intent_keywords)
-
-
-def save_model(model: NLUModel, output_path: str) -> None:
-    payload = {
-        "pipeline": model.pipeline,
-        "known_values": model.known_values,
-        "intent_keywords": model.intent_keywords,
-    }
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(payload, output)
+    intent_model.save_pretrained(intent_dir)
+    intent_tokenizer.save_pretrained(intent_dir)
+    ner_model.save_pretrained(ner_dir)
+    ner_tokenizer.save_pretrained(ner_dir)
+    (base / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
 
 def load_model(model_path: str) -> NLUModel:
-    payload = joblib.load(model_path)
+    base = Path(model_path)
+    intent_dir = base / "intent"
+    ner_dir = base / "ner"
+    metadata_path = base / "metadata.json"
+
+    if not intent_dir.exists() or not ner_dir.exists() or not metadata_path.exists():
+        raise FileNotFoundError(
+            f"Missing model artifacts in {model_path}. Expected intent/, ner/, and metadata.json"
+        )
+
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    id2intent = metadata.get("id2intent", {})
+    allowed_entities = metadata.get("allowed_entities", [])
+
+    intent_pipe = pipeline(
+        "text-classification",
+        model=str(intent_dir),
+        tokenizer=str(intent_dir),
+        device=-1,
+    )
+    ner_pipe = pipeline(
+        "token-classification",
+        model=str(ner_dir),
+        tokenizer=str(ner_dir),
+        device=-1,
+    )
+
     return NLUModel(
-        pipeline=payload["pipeline"],
-        known_values=payload.get("known_values", {}),
-        intent_keywords=payload.get("intent_keywords", {}),
+        intent_pipe=intent_pipe,
+        ner_pipe=ner_pipe,
+        id2intent=id2intent,
+        allowed_entities=allowed_entities,
     )
 
 
-def parse_annotated_example(example: str) -> Tuple[str, List[Dict[str, str]]]:
-    entities: List[Dict[str, str]] = []
+def parse_annotated_example(example: str) -> Tuple[str, List[Dict[str, Any]]]:
+    entities: List[Dict[str, Any]] = []
+    parts: List[str] = []
+    cursor = 0
 
-    def repl(match: re.Match[str]) -> str:
+    for match in ANNOTATED_RE.finditer(example):
+        parts.append(example[cursor:match.start()])
         value = match.group(1)
         entity = match.group(2)
-        entities.append({"entity": entity, "value": value})
-        return value
 
-    clean = re.sub(r"\[([^\]]+)\]\(([^\)]+)\)", repl, example)
+        start = sum(len(part) for part in parts)
+        parts.append(value)
+        end = start + len(value)
+        entities.append({"entity": entity, "value": value, "start": start, "end": end})
+
+        cursor = match.end()
+
+    parts.append(example[cursor:])
+    clean = "".join(parts)
     return clean.strip(), entities
 
 
-def convert_rasa_nlu(nlu_yml_path: str) -> Tuple[List[Tuple[str, str]], Dict[str, List[str]]]:
-    import yaml
-
+def convert_rasa_nlu(nlu_yml_path: str) -> Tuple[List[Dict[str, Any]], Dict[str, List[str]]]:
     content = yaml.safe_load(Path(nlu_yml_path).read_text(encoding="utf-8"))
-    samples: List[Tuple[str, str]] = []
+    samples: List[Dict[str, Any]] = []
     known_values: Dict[str, set[str]] = {}
 
     for block in content.get("nlu", []):
@@ -253,7 +156,7 @@ def convert_rasa_nlu(nlu_yml_path: str) -> Tuple[List[Tuple[str, str]], Dict[str
             if not example:
                 continue
             plain_text, entities = parse_annotated_example(example)
-            samples.append((plain_text, intent))
+            samples.append({"text": plain_text, "intent": intent, "entities": entities})
             for ent in entities:
                 known_values.setdefault(ent["entity"], set()).add(str(ent["value"]))
 

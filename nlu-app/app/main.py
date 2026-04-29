@@ -23,7 +23,10 @@ def ensure_token(token: str | None = Query(default=None)) -> None:
 @app.on_event("startup")
 def on_startup() -> None:
     global _nlu_model
-    _nlu_model = load_model(settings.model_path)
+    try:
+        _nlu_model = load_model(settings.model_path)
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"Failed to load NLU model artifacts: {exc}") from exc
 
 
 @app.get("/status")
