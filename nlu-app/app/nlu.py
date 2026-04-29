@@ -12,6 +12,7 @@ from transformers import pipeline
 from app.settings import settings
 
 ANNOTATED_RE = re.compile(r"\[([^\]]+)\]\(([^\)]+)\)")
+INTENT_FALLBACK = "nlu_fallback"
 
 
 class NLUModel:
@@ -36,38 +37,44 @@ class NLUModel:
     def parse(self, text: str) -> Dict[str, Any]:
         normalized = text.strip()
         ranking = self._predict_intents(normalized)
-        top1 = ranking[0] if ranking else {"name": "nlu_fallback", "confidence_raw": 0.0, "confidence_calibrated": 0.0}
+        top1 = ranking[0] if ranking else {"name": INTENT_FALLBACK, "confidence_raw": 0.0, "confidence_calibrated": 0.0}
         top2 = ranking[1] if len(ranking) > 1 else {"confidence_calibrated": 0.0}
-        margin = float(top1["confidence_calibrated"] - top2["confidence_calibrated"])
-
-        min_conf_passed = float(top1["confidence_calibrated"]) >= settings.intent_min_confidence
-        min_margin_passed = margin >= settings.intent_min_margin
-        accepted_intent = top1["name"]
-        reason = "accepted"
-        if not min_conf_passed:
-            accepted_intent = "nlu_fallback"
-            reason = "low_confidence"
-        elif not min_margin_passed:
-            accepted_intent = "nlu_fallback"
-            reason = "low_margin"
+        decision = self._build_decision(top1, top2)
 
         entities = self._extract_entities(normalized)
         return {
             "intent_top1": top1,
             "intent_ranking": ranking[: max(1, settings.intent_topk)],
-            "decision": {
-                "accepted_intent": accepted_intent,
-                "reason": reason,
-                "min_conf_passed": bool(min_conf_passed),
-                "min_margin_passed": bool(min_margin_passed),
-                "margin": margin,
-            },
+            "decision": decision,
             "entities": entities,
             "text_normalized": normalized,
             "model_info": {
                 "version": self.model_version,
                 "language_profile": self.language_profile,
             },
+        }
+
+    @staticmethod
+    def _build_decision(top1: Dict[str, Any], top2: Dict[str, Any]) -> Dict[str, Any]:
+        margin = float(top1["confidence_calibrated"] - top2["confidence_calibrated"])
+        min_conf_passed = float(top1["confidence_calibrated"]) >= settings.intent_min_confidence
+        min_margin_passed = margin >= settings.intent_min_margin
+
+        accepted_intent = str(top1["name"])
+        reason = "accepted"
+        if not min_conf_passed:
+            accepted_intent = INTENT_FALLBACK
+            reason = "low_confidence"
+        elif not min_margin_passed:
+            accepted_intent = INTENT_FALLBACK
+            reason = "low_margin"
+
+        return {
+            "accepted_intent": accepted_intent,
+            "reason": reason,
+            "min_conf_passed": bool(min_conf_passed),
+            "min_margin_passed": bool(min_margin_passed),
+            "margin": margin,
         }
 
     def _calibrate_score(self, score: float) -> float:
@@ -139,9 +146,7 @@ class NLUModel:
     @staticmethod
     def _normalize_entity_value(entity_name: str, value: str) -> str:
         cleaned = re.sub(r"\s+", " ", value).strip()
-        if entity_name == "region":
-            return cleaned.lower()
-        if entity_name == "app_name":
+        if entity_name in {"region", "app_name"}:
             return cleaned.lower()
         return cleaned
 

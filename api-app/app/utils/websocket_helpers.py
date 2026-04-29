@@ -1,19 +1,20 @@
-"""
-Utilitaires pour la gestion des WebSockets.
-"""
+"""Utilities for WebSocket progress and polling helpers."""
 import asyncio
 import time
-from typing import Optional, Dict, Any
+from typing import Any, Dict
+
 from fastapi import WebSocket
-from app.scalingo_manager import ScalingoManager
+
+from app.domain import AppId, Region
+from app.infrastructure.scalingo import AppsAPI
 
 
 class WebSocketHelpers:
-    """Utilitaires pour les opérations WebSocket."""
-    
-    def __init__(self, scalingo_manager: ScalingoManager):
-        self.scalingo_manager = scalingo_manager
-    
+    """Utilities for WebSocket operations."""
+
+    def __init__(self, apps_api: AppsAPI):
+        self.apps_api = apps_api
+
     async def send_progress_message(self, websocket: WebSocket, message: str) -> None:
         """Envoie un message de progression."""
         await websocket.send_text(message)
@@ -39,26 +40,22 @@ class WebSocketHelpers:
     
     async def check_app_status(self, websocket: WebSocket, app_name: str, region: str) -> bool:
         """Vérifie le statut de l'application."""
-        app_info = self.scalingo_manager.get_app_status(app_name, region)
-        
-        if not app_info:
+        result = self.apps_api.get_app_status(AppId(app_name), Region(region))
+        if not result.success:
             await self.send_progress_message(websocket, "❌ Unable to retrieve application status")
             return False
-        
-        app_data = app_info.get("app", {})
-        status = app_data.get("status")
-        
+
+        status = result.value.status
         if status == "running":
-            # Vérifier aussi les conteneurs
-            containers_info = self.scalingo_manager.get_containers_status(app_name, region)
-            if containers_info:
-                containers = containers_info.get("containers", [])
-                running_containers = len([c for c in containers if c.get("state") == "running"])
+            containers_result = self.apps_api.get_containers_status(AppId(app_name), Region(region))
+            if containers_result.success:
+                running_containers = len([c for c in containers_result.value if c.state == "running"])
                 if running_containers > 0:
-                    await self.send_progress_message(websocket, f"✅ Application is running with {running_containers} containers!")
+                    await self.send_progress_message(
+                        websocket, f"✅ Application is running with {running_containers} containers!"
+                    )
                     return True
-                else:
-                    await self.send_progress_message(websocket, "⚠️ App is 'running' but no containers are running...")
+                await self.send_progress_message(websocket, "⚠️ App is 'running' but no containers are running...")
             else:
                 await self.send_progress_message(websocket, "✅ Application is 'running'")
                 return True
@@ -70,15 +67,13 @@ class WebSocketHelpers:
     async def check_scaling_status(self, websocket: WebSocket, app_name: str, region: str, 
                                   container_name: str, target_amount: int) -> bool:
         """Vérifie le statut de scaling."""
-        containers_info = self.scalingo_manager.get_containers_status(app_name, region)
-        
-        if not containers_info:
+        result = self.apps_api.get_containers_status(AppId(app_name), Region(region))
+        if not result.success:
             await self.send_progress_message(websocket, "❌ Unable to retrieve container status")
             return False
-        
-        containers = containers_info.get("containers", [])
-        target_containers = [c for c in containers if c.get("type") == container_name]
-        running_count = len([c for c in target_containers if c.get("state") == "running"])
+
+        target_containers = [c for c in result.value if c.type == container_name]
+        running_count = len([c for c in target_containers if c.state == "running"])
         
         if running_count == target_amount:
             await self.send_progress_message(websocket, f"🎉 All {target_amount} containers are running!")
@@ -87,11 +82,11 @@ class WebSocketHelpers:
         # Afficher le statut actuel
         await self.send_progress_message(websocket, f"📊 Container status for *{container_name}*:")
         for i, container in enumerate(target_containers):
-            label = container.get("label", f"{container_name}-{i+1}")
-            state = container.get("state", "unknown")
-            size_info = container.get("container_size", {})
-            size = size_info.get("name", "unknown") if size_info else "unknown"
-            command = container.get("command", "")[:50] + "..." if len(container.get("command", "")) > 50 else container.get("command", "")
+            label = container.label or f"{container_name}-{i+1}"
+            state = container.state
+            size = container.size or "unknown"
+            command = container.command or ""
+            command = command[:50] + "..." if len(command) > 50 else command
             await self.send_progress_message(websocket, f"  • {label}: {state} ({size}) - {command}")
         
         return False

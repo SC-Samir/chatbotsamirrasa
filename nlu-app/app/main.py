@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -8,7 +9,6 @@ from app.nlu import NLUModel, load_model
 from app.schemas import ParseRequest, ParseResponseV2
 from app.settings import settings
 
-app = FastAPI(title="chatbotsamir-nlu", version="0.1.0")
 _nlu_model: Optional[NLUModel] = None
 
 
@@ -28,13 +28,27 @@ def ensure_contract(contract: str | None = Header(default=None, alias="X-NLU-Con
         )
 
 
-@app.on_event("startup")
+def get_model() -> NLUModel:
+    if _nlu_model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return _nlu_model
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    on_startup()
+    yield
+
+
 def on_startup() -> None:
     global _nlu_model
     try:
         _nlu_model = load_model(settings.model_path)
     except FileNotFoundError as exc:
         raise RuntimeError(f"Failed to load NLU model artifacts: {exc}") from exc
+
+
+app = FastAPI(title="chatbotsamir-nlu", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/status")
@@ -47,9 +61,8 @@ def parse(
     payload: ParseRequest,
     _: None = Depends(ensure_token),
     __: None = Depends(ensure_contract),
+    model: NLUModel = Depends(get_model),
 ) -> dict:
-    if _nlu_model is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
     if not payload.text.strip():
         raise HTTPException(status_code=422, detail="Text is required")
-    return _nlu_model.parse(payload.text)
+    return model.parse(payload.text)

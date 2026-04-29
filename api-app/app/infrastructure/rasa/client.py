@@ -5,8 +5,8 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-from app.core.logging import StructuredLogger
 from app.config import settings
+from app.core.logging import StructuredLogger
 
 logger = StructuredLogger("rasa_client")
 
@@ -16,6 +16,7 @@ class RasaClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = max(timeout_ms, 1000) / 1000.0
         self.auth_token = auth_token
+        self._client = httpx.AsyncClient(timeout=self.timeout)
 
     async def parse_message(self, text: str, retries: int = 1) -> Dict[str, Any]:
         payload = {"text": text}
@@ -24,27 +25,26 @@ class RasaClient:
 
         for attempt in range(retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.post(
-                        f"{self.base_url}/model/parse",
-                        json=payload,
-                        params=params,
-                        headers={"X-NLU-Contract": settings.nlu_expected_contract},
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-                    required_keys = {
-                        "intent_top1",
-                        "intent_ranking",
-                        "decision",
-                        "entities",
-                        "text_normalized",
-                        "model_info",
-                    }
-                    if not required_keys.issubset(set(data.keys())):
-                        raise ValueError("Invalid NLU v2 response payload")
-                    return data
-            except Exception as exc:
+                response = await self._client.post(
+                    f"{self.base_url}/model/parse",
+                    json=payload,
+                    params=params,
+                    headers={"X-NLU-Contract": settings.nlu_expected_contract},
+                )
+                response.raise_for_status()
+                data = response.json()
+                required_keys = {
+                    "intent_top1",
+                    "intent_ranking",
+                    "decision",
+                    "entities",
+                    "text_normalized",
+                    "model_info",
+                }
+                if not required_keys.issubset(set(data.keys())):
+                    raise ValueError("Invalid NLU v2 response payload")
+                return data
+            except (httpx.HTTPError, ValueError) as exc:
                 last_error = exc
                 logger.warning(
                     "Failed to parse message with Rasa service",

@@ -5,7 +5,7 @@ Ce repo est séparé en deux apps déployables indépendamment:
 - `api-app/`: FastAPI + WebSocket + Celery (métier)
 - `nlu-app/`: service NLU auto-hébergé (compatible `POST /model/parse`)
 
-`rasa-app/` est conservé temporairement pour rollback.
+Le moteur NLU actif est `nlu-app/` (contrat v2).
 
 ## Déploiement Scalingo
 

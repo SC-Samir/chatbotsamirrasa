@@ -26,7 +26,7 @@ app.add_middleware(LoggingMiddleware)
 
 components = build_components()
 
-container.register_singleton(type(components.scalingo_manager), components.scalingo_manager)
+container.register_singleton(type(components.apps_api), components.apps_api)
 container.register_singleton(type(components.logs_service), components.logs_service)
 container.register_singleton(type(components.intent_handler_manager), components.intent_handler_manager)
 container.register_singleton(type(components.websocket_handler), components.websocket_handler)

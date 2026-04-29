@@ -4,8 +4,9 @@ Handler pour la gestion des connexions WebSocket.
 import asyncio
 import json
 import re
+
 import redis
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 from app.models import AppContext, IntentResponse
 from app.handlers.intent_handlers import IntentHandlerManager
 from app.config import settings
@@ -118,8 +119,11 @@ class WebSocketHandler:
 
                     await websocket.send_text("😕 Command not recognized or incomplete. I need the app name, region and GitHub repo (optional: the git ref).")
                 
-        except Exception as e:
-            logger.error("WebSocket error", error=str(e))
+        except WebSocketDisconnect:
+            logger.info("WebSocket disconnected by client")
+        except (ValueError, RuntimeError) as exc:
+            logger.error("WebSocket processing error", error=str(exc))
+            await websocket.send_text("❌ Internal processing error. Please retry.")
         finally:
             if redis_task:
                 redis_task.cancel()
@@ -151,18 +155,18 @@ class WebSocketHandler:
                     except json.JSONDecodeError:
                         # Handle case where message data is not JSON
                         await websocket.send_text(str(message['data']))
-                    except Exception as e:
-                        logger.error("Error sending Redis message to websocket", error=str(e))
+                    except (TypeError, ValueError) as exc:
+                        logger.error("Error sending Redis message to websocket", error=str(exc))
                         break
                         
                 await asyncio.sleep(0.1)  # Small delay to avoid busy waiting
         except asyncio.CancelledError:
             logger.info("Redis Pub/Sub task cancelled", channel=channel)
-        except Exception as e:
-            logger.error("Redis Pub/Sub error", channel=channel, error=str(e))
+        except redis.RedisError as exc:
+            logger.error("Redis Pub/Sub error", channel=channel, error=str(exc))
         finally:
             try:
                 await asyncio.get_event_loop().run_in_executor(None, pubsub.unsubscribe, channel)
                 await asyncio.get_event_loop().run_in_executor(None, pubsub.close)
-            except Exception as e:
-                logger.error("Error closing Redis Pub/Sub", channel=channel, error=str(e))
+            except redis.RedisError as exc:
+                logger.error("Error closing Redis Pub/Sub", channel=channel, error=str(exc))

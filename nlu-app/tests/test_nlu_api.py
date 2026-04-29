@@ -39,17 +39,19 @@ def _build_test_model() -> str:
     return _MODEL_DIR
 
 
-def test_status_endpoint(monkeypatch):
-    model_path = _build_test_model()
-    monkeypatch.setenv("NLU_MODEL_PATH", model_path)
-
+def _boot_test_app(model_path: str) -> TestClient:
     from app import settings as settings_module
     from app import main as main_module
 
     settings_module.settings.model_path = model_path
     main_module.on_startup()
+    return TestClient(app)
 
-    client = TestClient(app)
+
+def test_status_endpoint(monkeypatch):
+    model_path = _build_test_model()
+    monkeypatch.setenv("NLU_MODEL_PATH", model_path)
+    client = _boot_test_app(model_path)
     response = client.get("/status")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
@@ -58,14 +60,7 @@ def test_status_endpoint(monkeypatch):
 def test_parse_endpoint(monkeypatch):
     model_path = _build_test_model()
     monkeypatch.setenv("NLU_MODEL_PATH", model_path)
-
-    from app import settings as settings_module
-    from app import main as main_module
-
-    settings_module.settings.model_path = model_path
-    main_module.on_startup()
-
-    client = TestClient(app)
+    client = _boot_test_app(model_path)
     response = client.post(
         "/model/parse",
         headers={"X-NLU-Contract": "v2"},
@@ -86,14 +81,7 @@ def test_parse_endpoint(monkeypatch):
 def test_parse_endpoint_rejects_missing_contract_header(monkeypatch):
     model_path = _build_test_model()
     monkeypatch.setenv("NLU_MODEL_PATH", model_path)
-
-    from app import settings as settings_module
-    from app import main as main_module
-
-    settings_module.settings.model_path = model_path
-    main_module.on_startup()
-
-    client = TestClient(app)
+    client = _boot_test_app(model_path)
     response = client.post(
         "/model/parse",
         json={"text": "deploy test-app on osc-fr1"},

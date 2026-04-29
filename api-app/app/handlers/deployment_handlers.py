@@ -40,14 +40,7 @@ class DeployHandler(BaseHandler):
         await websocket.send_text(f"✅ Understood! Launching deployment of *{app_name}* to *{region}*{git_ref_msg}...")
         
         # Déclenchement du déploiement
-        try:
-            deployment = self.deployment_service.trigger_deployment(app_name, region, github_repo, git_ref)
-        except Exception:
-            await self._send_error_message(
-                websocket,
-                "Scalingo API request timed out while starting deployment. Please retry in a few seconds.",
-            )
-            return True
+        deployment = self.deployment_service.trigger_deployment(app_name, region, github_repo, git_ref)
         
         if deployment:
             deployment_id = deployment["deployment"]["id"]
@@ -104,14 +97,7 @@ class CreateAndDeployHandler(BaseHandler):
         git_ref_msg = f" (ref: {git_ref})" if git_ref != "master" else ""
         await websocket.send_text(f"🚀 Starting creation process for *{app_name}*{git_ref_msg}...")
         
-        try:
-            new_app = self.deployment_service.create_app(app_name, region)
-        except Exception:
-            await self._send_error_message(
-                websocket,
-                "Scalingo API request timed out while creating the app. Please retry in a few seconds.",
-            )
-            return True
+        new_app = self.deployment_service.create_app(app_name, region)
         if not new_app:
             await self._send_error_message(websocket, "Application creation failed. The name might already be taken.")
             return True
@@ -119,14 +105,7 @@ class CreateAndDeployHandler(BaseHandler):
         await self._send_success_message(websocket, "Application created! Triggering first deployment...")
         
         # Déploiement
-        try:
-            deployment = self.deployment_service.trigger_deployment(app_name, region, github_repo, git_ref)
-        except Exception:
-            await self._send_error_message(
-                websocket,
-                "Scalingo API request timed out while starting deployment. Please retry in a few seconds.",
-            )
-            return True
+        deployment = self.deployment_service.trigger_deployment(app_name, region, github_repo, git_ref)
         
         if deployment:
             deployment_id = deployment["deployment"]["id"]

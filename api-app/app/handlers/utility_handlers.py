@@ -79,8 +79,8 @@ class GetLogsHandler(BaseHandler):
                     )
             else:
                 await self._send_error_message(websocket, f"Unable to retrieve logs URL for {app_name}.")
-        except Exception as e:
-            await self._send_error_message(websocket, f"Error retrieving logs: {str(e)}")
+        except (ValueError, RuntimeError):
+            await self._send_error_message(websocket, "Error retrieving logs.")
         
         return True
 
