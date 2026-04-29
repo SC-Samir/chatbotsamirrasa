@@ -3,6 +3,7 @@ Handler pour la gestion des connexions WebSocket.
 """
 import asyncio
 import json
+import re
 import redis
 from fastapi import WebSocket
 from app.models import AppContext, IntentResponse
@@ -21,6 +22,34 @@ class WebSocketHandler:
         self.rasa_client = rasa_client
         self.intent_handler_manager = intent_handler_manager
         self.redis_client = redis.from_url(settings.redis_url)
+
+    @staticmethod
+    def _build_logs_fallback_intent(text: str) -> IntentResponse | None:
+        """Build fallback intents from common free-text phrasing when NLU misses."""
+        candidate = (text or "").strip()
+        patterns = [
+            (r"^\s*(?:show|get)\s+logs?\s+(?:of|for)\s+([a-z0-9][a-z0-9-]*)\s+(?:on|in)\s+([a-z]{3}-[a-z]+\d)\s*$", "get_logs"),
+            (r"^\s*restart\s+(?:app\s+)?([a-z0-9][a-z0-9-]*)\s+(?:on|in)\s+([a-z]{3}-[a-z]+\d)\s*$", "restart"),
+            (r"^\s*(?:delete|remove)\s+(?:app\s+)?([a-z0-9][a-z0-9-]*)\s+(?:on|in)\s+([a-z]{3}-[a-z]+\d)\s*$", "delete_app"),
+            (r"^\s*(?:list|show|get)\s+(?:env|environment)\s*(?:vars|variables)?\s+(?:for|of)\s+([a-z0-9][a-z0-9-]*)\s+(?:on|in)\s+([a-z]{3}-[a-z]+\d)\s*$", "list_env_vars"),
+        ]
+
+        for pattern, intent_name in patterns:
+            match = re.match(pattern, candidate, re.IGNORECASE)
+            if not match:
+                continue
+            app_name = match.group(1).lower()
+            region = match.group(2).lower()
+            return IntentResponse(
+                intent={"name": intent_name, "confidence": 1.0},
+                entities=[
+                    {"entity": "app_name", "value": app_name},
+                    {"entity": "region", "value": region},
+                ],
+                text=text,
+            )
+
+        return None
     
     async def handle_connection(self, websocket: WebSocket) -> None:
         """Handle a WebSocket connection."""
@@ -66,6 +95,14 @@ class WebSocketHandler:
                     )
                     current_deployment_id = deployment_id
                 elif not result:
+                    fallback_intent = self._build_logs_fallback_intent(data)
+                    if fallback_intent:
+                        fallback_result = await self.intent_handler_manager.handle_intent(
+                            websocket, fallback_intent, context
+                        )
+                        if fallback_result:
+                            continue
+
                     await websocket.send_text("😕 Command not recognized or incomplete. I need the app name, region and GitHub repo (optional: the git ref).")
                 
         except Exception as e:

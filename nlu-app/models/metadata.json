@@ -1,0 +1,176 @@
+{
+  "id2intent": {
+    "0": "add_env_var",
+    "1": "create_and_deploy",
+    "2": "delete_app",
+    "3": "deploy",
+    "4": "get_logs",
+    "5": "list_env_vars",
+    "6": "rename_app",
+    "7": "restart",
+    "8": "scale",
+    "9": "show_context"
+  },
+  "allowed_entities": [
+    "aliases",
+    "app_name",
+    "container_amount",
+    "container_name",
+    "container_size",
+    "filter",
+    "git_ref",
+    "github_repo",
+    "n",
+    "new_name",
+    "region",
+    "scope",
+    "variable_name",
+    "variable_value"
+  ],
+  "base_model": "prajjwal1/bert-tiny",
+  "epochs": 1,
+  "max_length": 128,
+  "num_samples": 207,
+  "known_values": {
+    "app_name": [
+      "samir-test-francois-ai-trois",
+      "samir-test-francois-ai-deux",
+      "notification-service",
+      "user-service-prod",
+      "production-api-v2",
+      "microservice-auth",
+      "staging-frontend",
+      "frontend-staging",
+      "test-backend-v2",
+      "mon-app-staging",
+      "scalintestrasa",
+      "production-api",
+      "data-processor",
+      "samirpgvector",
+      "mon-app-test",
+      "frontend-app",
+      "new-service",
+      "backend-api",
+      "api-backend",
+      "webapp2024",
+      "my-new-app",
+      "test-app",
+      "myapp123",
+      "mon-app",
+      "my-app"
+    ],
+    "region": [
+      "osc-secnum-fr1",
+      "osc-fr1"
+    ],
+    "github_repo": [
+      "https://github.com/Scalingo/sample-node-express",
+      "https://github.com/Scalingo/sample-ruby-rails",
+      "https://github.com/Scalingo/sample-go-martini",
+      "https://github.com/company/frontend",
+      "https://github.com/myorg/frontend",
+      "https://github.com/user/pgvector",
+      "https://github.com/myorg/backend",
+      "https://github.com/user/newrepo",
+      "https://github.com/org/service",
+      "https://github.com/company/api",
+      "https://github.com/user/repo",
+      "https://github.com/test/repo",
+      "https://github.com/myorg/api",
+      "https://github.com/test/app",
+      "https://github.com/org/auth"
+    ],
+    "git_ref": [
+      "production",
+      "staging",
+      "develop",
+      "v1.2.3",
+      "travis",
+      "master",
+      "main"
+    ],
+    "filter": [
+      "worker",
+      "web-1",
+      "web"
+    ],
+    "n": [
+      "100",
+      "50"
+    ],
+    "scope": [
+      "web,worker",
+      "worker",
+      "web-1",
+      "web"
+    ],
+    "container_name": [
+      "worker",
+      "web"
+    ],
+    "container_amount": [
+      "6",
+      "5",
+      "4",
+      "3",
+      "2",
+      "1",
+      "0"
+    ],
+    "container_size": [
+      "XL",
+      "M",
+      "L"
+    ],
+    "new_name": [
+      "frontend-staging",
+      "test-app-prod",
+      "pgvector-prod",
+      "notifications",
+      "processor-v2",
+      "backend-test",
+      "auth-service",
+      "webapp-prod",
+      "my-new-app",
+      "backend-v2",
+      "my-app-v2",
+      "user-api",
+      "api-v3"
+    ],
+    "aliases": [
+      "false",
+      "true"
+    ],
+    "variable_name": [
+      "MAX_CONNECTIONS",
+      "WORKER_COUNT",
+      "DATABASE_URL",
+      "SECRET_KEY",
+      "JWT_SECRET",
+      "REDIS_URL",
+      "RAILS_ENV",
+      "LOG_LEVEL",
+      "CACHE_TTL",
+      "NODE_ENV",
+      "TIMEOUT",
+      "API_KEY",
+      "DEBUG",
+      "PORT"
+    ],
+    "variable_value": [
+      "postgresql://user:pass@host:5432/db",
+      "redis://localhost:6379",
+      "jwt-secret-key-456",
+      "my-secret-key-123",
+      "abc123def456",
+      "production",
+      "true",
+      "info",
+      "3600",
+      "3000",
+      "100",
+      "30",
+      "4"
+    ]
+  }
+}

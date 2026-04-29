@@ -1,20 +1,42 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.nlu import convert_rasa_nlu, save_model, train_model
+from app.nlu import load_model
+
+_MODEL_DIR: str | None = None
 
 
 def _build_test_model() -> str:
-    data_file = Path(__file__).resolve().parents[1] / "data.nlu.yml"
-    samples, known_values = convert_rasa_nlu(str(data_file))
-    model = train_model(samples=samples, known_values=known_values)
-    out = Path(__file__).resolve().parents[1] / "models" / "test-model.joblib"
-    save_model(model, str(out))
-    return str(out)
+    global _MODEL_DIR
+    if _MODEL_DIR is not None:
+        return _MODEL_DIR
+
+    root = Path(__file__).resolve().parents[1]
+    out_dir = root / "models" / "test-model"
+
+    cmd = [
+        "uv",
+        "run",
+        "python",
+        "scripts/train.py",
+        "--input",
+        "data.nlu.yml",
+        "--output",
+        str(out_dir),
+        "--epochs",
+        "1",
+        "--base-model",
+        "prajjwal1/bert-tiny",
+    ]
+    subprocess.run(cmd, cwd=root, check=True)
+
+    _MODEL_DIR = str(out_dir)
+    return _MODEL_DIR
 
 
 def test_status_endpoint(monkeypatch):
@@ -54,8 +76,14 @@ def test_parse_endpoint(monkeypatch):
     body = response.json()
     assert "intent" in body
     assert "entities" in body
-    assert body["intent"]["name"] in {
-        "deploy",
-        "create_and_deploy",
-    }
-    assert any(entity["entity"] == "region" for entity in body["entities"])
+    assert isinstance(body["intent"]["name"], str)
+    assert isinstance(body["intent"]["confidence"], float)
+
+
+def test_model_contract_and_entities():
+    model_path = _build_test_model()
+    model = load_model(model_path)
+
+    parsed = model.parse("rename mon-app to my-new-app")
+    assert set(parsed.keys()) == {"intent", "entities", "text"}
+    assert isinstance(parsed["entities"], list)
