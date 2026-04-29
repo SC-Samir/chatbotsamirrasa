@@ -84,7 +84,7 @@ class NLUModel:
         ranking: List[Dict[str, float | str]] = []
         for result in results:
             label = str(result.get("label", ""))
-            intent_name = self.id2intent.get(label, label)
+            intent_name = self._resolve_intent_label(label)
             raw_score = float(result.get("score", 0.0))
             ranking.append(
                 {
@@ -95,6 +95,15 @@ class NLUModel:
             )
         ranking.sort(key=lambda item: float(item["confidence_calibrated"]), reverse=True)
         return ranking
+
+    def _resolve_intent_label(self, label: str) -> str:
+        if label in self.id2intent:
+            return str(self.id2intent[label])
+        match = re.match(r"^LABEL_(\d+)$", label)
+        if match:
+            idx = match.group(1)
+            return str(self.id2intent.get(idx, label))
+        return label
 
     def _extract_entities(self, text: str) -> List[Dict[str, Any]]:
         raw_entities = self.ner_pipe(text, aggregation_strategy="simple")
