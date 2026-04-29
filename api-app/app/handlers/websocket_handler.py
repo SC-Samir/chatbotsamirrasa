@@ -41,12 +41,21 @@ class WebSocketHandler:
             app_name = match.group(1).lower()
             region = match.group(2).lower()
             return IntentResponse(
-                intent={"name": intent_name, "confidence": 1.0},
+                intent_top1={"name": intent_name, "confidence_calibrated": 1.0, "confidence_raw": 1.0},
+                intent_ranking=[{"name": intent_name, "confidence_calibrated": 1.0, "confidence_raw": 1.0}],
+                decision={
+                    "accepted_intent": intent_name,
+                    "reason": "accepted",
+                    "min_conf_passed": True,
+                    "min_margin_passed": True,
+                    "margin": 1.0,
+                },
                 entities=[
                     {"entity": "app_name", "value": app_name},
                     {"entity": "region", "value": region},
                 ],
-                text=text,
+                text_normalized=candidate,
+                model_info={"version": "regex-fallback", "language_profile": "rule-based"},
             )
 
         return None
@@ -69,11 +78,7 @@ class WebSocketHandler:
                 # Parser le message avec Rasa
                 interpretation = await self.rasa_client.parse_message(text=data, retries=1)
                 
-                intent_response = IntentResponse(
-                    intent=interpretation["intent"],
-                    entities=interpretation["entities"],
-                    text=data
-                )
+                intent_response = IntentResponse(**interpretation)
                 
                 
                 # Traiter l'intent
@@ -95,13 +100,21 @@ class WebSocketHandler:
                     )
                     current_deployment_id = deployment_id
                 elif not result:
-                    fallback_intent = self._build_logs_fallback_intent(data)
-                    if fallback_intent:
-                        fallback_result = await self.intent_handler_manager.handle_intent(
-                            websocket, fallback_intent, context
+                    if intent_response.accepted_intent == "nlu_fallback":
+                        ranking = intent_response.intent_ranking[: max(1, settings.nlu_clarification_topk)]
+                        suggestions = ", ".join(item.get("name", "unknown") for item in ranking if item.get("name"))
+                        await websocket.send_text(
+                            f"I’m not fully confident. Did you mean: {suggestions}?"
                         )
-                        if fallback_result:
-                            continue
+
+                    if settings.nlu_fallback_enable_regex and intent_response.accepted_intent == "nlu_fallback":
+                        fallback_intent = self._build_logs_fallback_intent(data)
+                        if fallback_intent:
+                            fallback_result = await self.intent_handler_manager.handle_intent(
+                                websocket, fallback_intent, context
+                            )
+                            if fallback_result:
+                                continue
 
                     await websocket.send_text("😕 Command not recognized or incomplete. I need the app name, region and GitHub repo (optional: the git ref).")
                 

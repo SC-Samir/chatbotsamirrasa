@@ -18,7 +18,7 @@ class DeployHandler(BaseHandler):
         self.deployment_service = deployment_service
     
     async def handle(self, websocket: WebSocket, intent_response: IntentResponse, context: AppContext) -> bool:
-        if intent_response.intent["name"] != "deploy":
+        if intent_response.accepted_intent != "deploy":
             return False
         
         # Validation commune
@@ -83,7 +83,7 @@ class CreateAndDeployHandler(BaseHandler):
         self.deployment_service = deployment_service
     
     async def handle(self, websocket: WebSocket, intent_response: IntentResponse, context: AppContext) -> bool:
-        if intent_response.intent["name"] != "create_and_deploy":
+        if intent_response.accepted_intent != "create_and_deploy":
             return False
         
         # Validation commune

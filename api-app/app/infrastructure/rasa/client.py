@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 import httpx
 
 from app.core.logging import StructuredLogger
+from app.config import settings
 
 logger = StructuredLogger("rasa_client")
 
@@ -28,11 +29,20 @@ class RasaClient:
                         f"{self.base_url}/model/parse",
                         json=payload,
                         params=params,
+                        headers={"X-NLU-Contract": settings.nlu_expected_contract},
                     )
                     response.raise_for_status()
                     data = response.json()
-                    if "intent" not in data or "entities" not in data:
-                        raise ValueError("Invalid Rasa response payload")
+                    required_keys = {
+                        "intent_top1",
+                        "intent_ranking",
+                        "decision",
+                        "entities",
+                        "text_normalized",
+                        "model_info",
+                    }
+                    if not required_keys.issubset(set(data.keys())):
+                        raise ValueError("Invalid NLU v2 response payload")
                     return data
             except Exception as exc:
                 last_error = exc

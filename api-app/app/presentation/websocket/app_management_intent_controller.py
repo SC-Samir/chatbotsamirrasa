@@ -53,7 +53,7 @@ class AppManagementIntentController:
         self.context_manager = ContextManager()
 
     async def handle(self, websocket: WebSocket, intent_response: IntentResponse, context: AppContext) -> bool:
-        intent_name = intent_response.intent.get("name")
+        intent_name = intent_response.accepted_intent
         if intent_name not in self.SUPPORTED_INTENTS:
             return False
 

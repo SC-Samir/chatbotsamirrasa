@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     rasa_url: str = "http://localhost:5005"
     rasa_timeout_ms: int = 3000
     rasa_auth_token: str | None = None
+    nlu_expected_contract: str = "v2"
+    nlu_fallback_enable_regex: bool = True
+    nlu_clarification_topk: int = 3
     
     # Application
     app_name: str = "ScalingoOps Agent"

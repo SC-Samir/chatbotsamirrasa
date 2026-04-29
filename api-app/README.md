@@ -9,6 +9,9 @@ Cette app expose l'API HTTP/WebSocket et délègue la compréhension des intents
 - `RASA_URL` (défaut `http://localhost:5005`, doit pointer vers `chatbotsamir-nlu` en prod)
 - `RASA_TIMEOUT_MS` (défaut `3000`)
 - `RASA_AUTH_TOKEN` (optionnel, transmis au NLU en query param `token`)
+- `NLU_EXPECTED_CONTRACT` (defaut `v2`, envoye en header `X-NLU-Contract`)
+- `NLU_FALLBACK_ENABLE_REGEX` (defaut `true`)
+- `NLU_CLARIFICATION_TOPK` (defaut `3`)
 - `DEBUG` (défaut `false`)
 
 ## Lancement local

@@ -42,12 +42,21 @@ async def test_controller_routes_restart_and_emits_structured_messages():
     websocket = FakeWebSocket()
     context = AppContext()
     intent = IntentResponse(
-        intent={"name": "restart"},
+        intent_top1={"name": "restart", "confidence_calibrated": 0.98, "confidence_raw": 0.95},
+        intent_ranking=[{"name": "restart", "confidence_calibrated": 0.98, "confidence_raw": 0.95}],
+        decision={
+            "accepted_intent": "restart",
+            "reason": "accepted",
+            "min_conf_passed": True,
+            "min_margin_passed": True,
+            "margin": 0.7,
+        },
         entities=[
             {"entity": "app_name", "value": "demo-app"},
             {"entity": "region", "value": "osc-fr1"},
         ],
-        text="restart demo-app",
+        text_normalized="restart demo-app",
+        model_info={"version": "test", "language_profile": "fr_en_mixed"},
     )
 
     handled = await controller.handle(websocket, intent, context)
@@ -76,7 +85,20 @@ async def test_controller_returns_validation_message_on_missing_params():
 
     websocket = FakeWebSocket()
     context = AppContext()
-    intent = IntentResponse(intent={"name": "delete_app"}, entities=[], text="delete")
+    intent = IntentResponse(
+        intent_top1={"name": "delete_app", "confidence_calibrated": 0.7, "confidence_raw": 0.7},
+        intent_ranking=[{"name": "delete_app", "confidence_calibrated": 0.7, "confidence_raw": 0.7}],
+        decision={
+            "accepted_intent": "delete_app",
+            "reason": "accepted",
+            "min_conf_passed": True,
+            "min_margin_passed": True,
+            "margin": 0.6,
+        },
+        entities=[],
+        text_normalized="delete",
+        model_info={"version": "test", "language_profile": "fr_en_mixed"},
+    )
 
     handled = await controller.handle(websocket, intent, context)
 

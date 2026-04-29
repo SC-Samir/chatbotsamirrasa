@@ -15,7 +15,7 @@ class _BaseAppManagementHandler(BaseHandler):
         self.controller = controller
 
     async def handle(self, websocket: WebSocket, intent_response: IntentResponse, context: AppContext) -> bool:
-        if intent_response.intent.get("name") != self.target_intent:
+        if intent_response.accepted_intent != self.target_intent:
             return False
         return await self.controller.handle(websocket, intent_response, context)
 

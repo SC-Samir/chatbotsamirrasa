@@ -17,7 +17,7 @@ class GetLogsHandler(BaseHandler):
         self.logs_service = logs_service
     
     async def handle(self, websocket: WebSocket, intent_response: IntentResponse, context: AppContext) -> bool:
-        if intent_response.intent["name"] != "get_logs":
+        if intent_response.accepted_intent != "get_logs":
             return False
         
         entities = self.context_manager.extract_entities(intent_response)
@@ -45,7 +45,7 @@ class GetLogsHandler(BaseHandler):
                 n = 100
         
         # Détection du streaming
-        stream = "stream" in intent_response.text.lower() or "streamer" in intent_response.text.lower()
+        stream = "stream" in intent_response.text_normalized.lower() or "streamer" in intent_response.text_normalized.lower()
         
         # Messages informatifs
         filter_info = f" (filtered by: {filter_param})" if filter_param else ""
@@ -92,7 +92,7 @@ class ShowContextHandler(BaseHandler):
         super().__init__(websocket_helpers)
     
     async def handle(self, websocket: WebSocket, intent_response: IntentResponse, context: AppContext) -> bool:
-        if intent_response.intent["name"] != "show_context":
+        if intent_response.accepted_intent != "show_context":
             return False
         
         context_items = []

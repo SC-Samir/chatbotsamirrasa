@@ -68,16 +68,37 @@ def test_parse_endpoint(monkeypatch):
     client = TestClient(app)
     response = client.post(
         "/model/parse",
+        headers={"X-NLU-Contract": "v2"},
         json={
             "text": "deploy samirpgvector on osc-fr1 from https://github.com/Scalingo/sample-ruby-rails branch main"
         },
     )
     assert response.status_code == 200
     body = response.json()
-    assert "intent" in body
+    assert "intent_top1" in body
+    assert "intent_ranking" in body
+    assert "decision" in body
     assert "entities" in body
-    assert isinstance(body["intent"]["name"], str)
-    assert isinstance(body["intent"]["confidence"], float)
+    assert isinstance(body["intent_top1"]["name"], str)
+    assert isinstance(body["intent_top1"]["confidence_calibrated"], float)
+
+
+def test_parse_endpoint_rejects_missing_contract_header(monkeypatch):
+    model_path = _build_test_model()
+    monkeypatch.setenv("NLU_MODEL_PATH", model_path)
+
+    from app import settings as settings_module
+    from app import main as main_module
+
+    settings_module.settings.model_path = model_path
+    main_module.on_startup()
+
+    client = TestClient(app)
+    response = client.post(
+        "/model/parse",
+        json={"text": "deploy test-app on osc-fr1"},
+    )
+    assert response.status_code == 400
 
 
 def test_model_contract_and_entities():
@@ -85,5 +106,12 @@ def test_model_contract_and_entities():
     model = load_model(model_path)
 
     parsed = model.parse("rename mon-app to my-new-app")
-    assert set(parsed.keys()) == {"intent", "entities", "text"}
+    assert set(parsed.keys()) == {
+        "intent_top1",
+        "intent_ranking",
+        "decision",
+        "entities",
+        "text_normalized",
+        "model_info",
+    }
     assert isinstance(parsed["entities"], list)

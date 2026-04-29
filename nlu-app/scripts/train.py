@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 from dataclasses import dataclass
@@ -100,7 +101,21 @@ def compute_intent_metrics(eval_pred: tuple[np.ndarray, np.ndarray]) -> Dict[str
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
     accuracy = float((preds == labels).mean())
-    return {"accuracy": accuracy}
+    labels = labels.astype(int)
+    preds = preds.astype(int)
+    classes = sorted(set(labels.tolist()))
+
+    f1_scores: List[float] = []
+    for cls in classes:
+        tp = int(((preds == cls) & (labels == cls)).sum())
+        fp = int(((preds == cls) & (labels != cls)).sum())
+        fn = int(((preds != cls) & (labels == cls)).sum())
+        precision = tp / (tp + fp) if (tp + fp) else 0.0
+        recall = tp / (tp + fn) if (tp + fn) else 0.0
+        f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+        f1_scores.append(float(f1))
+    macro_f1 = float(sum(f1_scores) / len(f1_scores)) if f1_scores else 0.0
+    return {"accuracy": accuracy, "macro_f1": macro_f1}
 
 
 def compute_ner_metrics(eval_pred: tuple[np.ndarray, np.ndarray]) -> Dict[str, float]:
@@ -121,6 +136,20 @@ def compute_ner_metrics(eval_pred: tuple[np.ndarray, np.ndarray]) -> Dict[str, f
     return {"token_accuracy": token_accuracy}
 
 
+def _safe_train_eval_split(dataset: Dataset) -> tuple[Dataset, Dataset]:
+    if len(dataset) < 10:
+        return dataset, dataset
+    try:
+        split = dataset.class_encode_column("label").train_test_split(
+            test_size=0.2,
+            seed=42,
+            stratify_by_column="label",
+        )
+    except Exception:
+        split = dataset.train_test_split(test_size=0.2, seed=42)
+    return split["train"], split["test"]
+
+
 def train_intent_model(dataset: Dataset, output_dir: str, epochs: int, max_length: int, base_model: str):
     tokenizer = AutoTokenizer.from_pretrained(base_model)
 
@@ -128,7 +157,12 @@ def train_intent_model(dataset: Dataset, output_dir: str, epochs: int, max_lengt
     num_labels = len(label_names)
     model = AutoModelForSequenceClassification.from_pretrained(base_model, num_labels=num_labels)
 
-    tokenized = dataset.map(
+    train_ds, eval_ds = _safe_train_eval_split(dataset)
+    tokenized_train = train_ds.map(
+        lambda batch: tokenizer(batch["text"], truncation=True, max_length=max_length),
+        batched=True,
+    )
+    tokenized_eval = eval_ds.map(
         lambda batch: tokenizer(batch["text"], truncation=True, max_length=max_length),
         batched=True,
     )
@@ -141,7 +175,7 @@ def train_intent_model(dataset: Dataset, output_dir: str, epochs: int, max_lengt
         learning_rate=2e-5,
         logging_steps=10,
         save_strategy="no",
-        eval_strategy="no",
+        eval_strategy="epoch",
         report_to=[],
         dataloader_num_workers=0,
     )
@@ -149,12 +183,14 @@ def train_intent_model(dataset: Dataset, output_dir: str, epochs: int, max_lengt
     trainer = Trainer(
         model=model,
         args=args,
-        train_dataset=tokenized,
+        train_dataset=tokenized_train,
+        eval_dataset=tokenized_eval,
         data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
         compute_metrics=compute_intent_metrics,
     )
     trainer.train()
-    return model, tokenizer
+    metrics = trainer.evaluate()
+    return model, tokenizer, metrics
 
 
 def train_ner_model(samples: List[Dict[str, Any]], output_dir: str, epochs: int, max_length: int, base_model: str):
@@ -170,7 +206,11 @@ def train_ner_model(samples: List[Dict[str, Any]], output_dir: str, epochs: int,
         label2id=label2id,
     )
 
-    tokenized_dataset = prepare_ner_dataset(samples, tokenizer, label2id, max_length)
+    pivot = int(max(1, len(samples) * 0.8))
+    train_samples = samples[:pivot]
+    eval_samples = samples[pivot:] or samples[:1]
+    tokenized_train_dataset = prepare_ner_dataset(train_samples, tokenizer, label2id, max_length)
+    tokenized_eval_dataset = prepare_ner_dataset(eval_samples, tokenizer, label2id, max_length)
 
     args = TrainingArguments(
         output_dir=output_dir,
@@ -180,7 +220,7 @@ def train_ner_model(samples: List[Dict[str, Any]], output_dir: str, epochs: int,
         learning_rate=2e-5,
         logging_steps=10,
         save_strategy="no",
-        eval_strategy="no",
+        eval_strategy="epoch",
         report_to=[],
         dataloader_num_workers=0,
     )
@@ -188,12 +228,14 @@ def train_ner_model(samples: List[Dict[str, Any]], output_dir: str, epochs: int,
     trainer = Trainer(
         model=model,
         args=args,
-        train_dataset=tokenized_dataset,
+        train_dataset=tokenized_train_dataset,
+        eval_dataset=tokenized_eval_dataset,
         data_collator=DataCollatorForTokenClassification(tokenizer=tokenizer),
         compute_metrics=compute_ner_metrics,
     )
     trainer.train()
-    return model, tokenizer, labels
+    metrics = trainer.evaluate()
+    return model, tokenizer, labels, metrics
 
 
 def main() -> None:
@@ -203,6 +245,9 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=3, help="Number of training epochs")
     parser.add_argument("--max-length", type=int, default=128, help="Maximum sequence length")
     parser.add_argument("--base-model", default="prajjwal1/bert-tiny", help="HF base model for fine-tuning")
+    parser.add_argument("--model-version", default="dev", help="Model version saved in metadata")
+    parser.add_argument("--language-profile", default="fr_en_mixed", help="Language profile in metadata")
+    parser.add_argument("--report-dir", default="reports", help="Training report output directory")
     args = parser.parse_args()
 
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -213,7 +258,7 @@ def main() -> None:
 
     intent_dataset, _intent2id, id2intent = build_intent_dataset(samples)
 
-    intent_model, intent_tokenizer = train_intent_model(
+    intent_model, intent_tokenizer, intent_metrics = train_intent_model(
         dataset=intent_dataset,
         output_dir=f"{args.output}/_intent_training",
         epochs=args.epochs,
@@ -221,7 +266,7 @@ def main() -> None:
         base_model=args.base_model,
     )
 
-    ner_model, ner_tokenizer, ner_labels = train_ner_model(
+    ner_model, ner_tokenizer, ner_labels, ner_metrics = train_ner_model(
         samples=samples,
         output_dir=f"{args.output}/_ner_training",
         epochs=args.epochs,
@@ -237,6 +282,9 @@ def main() -> None:
         "max_length": args.max_length,
         "num_samples": len(samples),
         "known_values": known_values,
+        "model_version": args.model_version,
+        "language_profile": args.language_profile,
+        "calibration": {"temperature": 1.0},
     }
 
     save_model_artifacts(
@@ -249,6 +297,17 @@ def main() -> None:
     )
     shutil.rmtree(f"{args.output}/_intent_training", ignore_errors=True)
     shutil.rmtree(f"{args.output}/_ner_training", ignore_errors=True)
+    os.makedirs(args.report_dir, exist_ok=True)
+    report = {
+        "intent_metrics": intent_metrics,
+        "ner_metrics": ner_metrics,
+        "num_samples": len(samples),
+        "base_model": args.base_model,
+        "model_version": args.model_version,
+        "language_profile": args.language_profile,
+    }
+    with open(f"{args.report_dir}/training_report.json", "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2)
 
     print(f"Model saved to {args.output} with {len(samples)} samples")
 
