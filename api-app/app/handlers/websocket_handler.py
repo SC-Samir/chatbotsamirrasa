@@ -42,19 +42,19 @@ class WebSocketHandler:
             app_name = match.group(1).lower()
             region = match.group(2).lower()
             return IntentResponse(
-                intent_top1={"name": intent_name, "confidence_calibrated": 1.0, "confidence_raw": 1.0},
-                intent_ranking=[{"name": intent_name, "confidence_calibrated": 1.0, "confidence_raw": 1.0}],
-                decision={
-                    "accepted_intent": intent_name,
+                hypotheses=[{"name": intent_name, "confidence": 1.0, "confidence_calibrated": 1.0, "rank": 1, "rationale_features": {"source": 1.0}}],
+                final_decision={
+                    "action": "accept",
+                    "intent": intent_name,
                     "reason": "accepted",
-                    "min_conf_passed": True,
-                    "min_margin_passed": True,
+                    "policy": {"source": "regex"},
                     "margin": 1.0,
                 },
                 entities=[
                     {"entity": "app_name", "value": app_name},
                     {"entity": "region", "value": region},
                 ],
+                quality_signals={"ambiguity_score": 0.0, "ood_likelihood": 0.0, "calibration_band": "high"},
                 text_normalized=candidate,
                 model_info={"version": "regex-fallback", "language_profile": "rule-based"},
             )
@@ -66,7 +66,6 @@ class WebSocketHandler:
         await websocket.accept()
         await websocket.send_text("Hello! I'm the ScalingoOps agent. What can I do for you?")
         
-        current_deployment_id = None
         redis_task = None
         
         # Contexte mémorisé
@@ -99,16 +98,15 @@ class WebSocketHandler:
                     redis_task = asyncio.create_task(
                         self.listen_redis_pubsub(websocket, channel)
                     )
-                    current_deployment_id = deployment_id
                 elif not result:
-                    if intent_response.accepted_intent == "nlu_fallback":
-                        ranking = intent_response.intent_ranking[: max(1, settings.nlu_clarification_topk)]
+                    if intent_response.decision_action == "clarify":
+                        ranking = intent_response.hypotheses[: max(1, settings.nlu_clarification_topk)]
                         suggestions = ", ".join(item.get("name", "unknown") for item in ranking if item.get("name"))
                         await websocket.send_text(
                             f"I’m not fully confident. Did you mean: {suggestions}?"
                         )
 
-                    if settings.nlu_fallback_enable_regex and intent_response.accepted_intent == "nlu_fallback":
+                    if settings.nlu_fallback_enable_regex and intent_response.decision_action in {"clarify", "reject"}:
                         fallback_intent = self._build_logs_fallback_intent(data)
                         if fallback_intent:
                             fallback_result = await self.intent_handler_manager.handle_intent(

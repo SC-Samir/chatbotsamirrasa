@@ -46,6 +46,20 @@ def test_request_fails_after_single_401_retry(httpx_mock):
     assert provider.refresh_calls == 1
 
 
+def test_request_retries_on_429(httpx_mock):
+    provider = DummyTokenProvider()
+    client = ScalingoHTTPClient(provider)
+
+    url = "https://api.osc-fr1.scalingo.com/v1/apps/demo"
+    httpx_mock.add_response(method="GET", url=url, status_code=429, json={"error": "rate_limited"})
+    httpx_mock.add_response(method="GET", url=url, status_code=200, json={"app": {"name": "demo"}})
+
+    result = client.request("GET", Region.OSC_FR1, "/v1/apps/demo")
+
+    assert result.success is True
+    assert result.value == {"app": {"name": "demo"}}
+
+
 class FailingTokenProvider:
     def get_token(self) -> str:
         raise RuntimeError("token exchange timeout")

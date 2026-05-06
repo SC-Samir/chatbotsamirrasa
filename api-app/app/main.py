@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.config import settings
 from app.core.composition import build_components
+from app.copilot.composition import build_copilot_components
 from app.core.container import container
 from app.core.logging import StructuredLogger
 from app.middleware.error_handler import ErrorHandlerMiddleware
@@ -24,12 +25,14 @@ app = FastAPI(
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(LoggingMiddleware)
 
-components = build_components()
+components = build_components(enable_legacy_intent_stack=settings.enable_legacy_intent_stack)
+copilot_components = build_copilot_components()
 
 container.register_singleton(type(components.apps_api), components.apps_api)
 container.register_singleton(type(components.logs_service), components.logs_service)
-container.register_singleton(type(components.intent_handler_manager), components.intent_handler_manager)
-container.register_singleton(type(components.websocket_handler), components.websocket_handler)
+if settings.enable_legacy_intent_stack and components.intent_handler_manager and components.websocket_handler:
+    container.register_singleton(type(components.intent_handler_manager), components.intent_handler_manager)
+    container.register_singleton(type(components.websocket_handler), components.websocket_handler)
 
 templates = Jinja2Templates(directory="templates")
 
@@ -39,6 +42,8 @@ logger.info(
     debug_mode=settings.debug,
     redis_url=settings.redis_url,
 )
+if not settings.enable_legacy_intent_stack:
+    logger.info("Legacy intent stack disabled", websocket_contract="ws.v2-only")
 
 
 @app.get("/")
@@ -178,9 +183,9 @@ async def display_app_logs(app_name: str, region: str, n: int = 100, filter: str
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await components.websocket_handler.handle_connection(websocket)
+    await copilot_components.websocket_handler.handle_connection(websocket)
 
 
 @app.websocket("/ws/")
 async def websocket_endpoint_slash(websocket: WebSocket):
-    await components.websocket_handler.handle_connection(websocket)
+    await copilot_components.websocket_handler.handle_connection(websocket)

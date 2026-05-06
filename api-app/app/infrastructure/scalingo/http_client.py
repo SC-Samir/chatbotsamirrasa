@@ -1,4 +1,5 @@
 """Unified HTTP request pipeline for Scalingo APIs."""
+import time
 from typing import Any, Dict, Optional
 
 import httpx
@@ -16,6 +17,7 @@ class ScalingoHTTPClient:
     def __init__(self, token_provider: AuthTokenProvider, timeout_seconds: float = 20.0):
         self._token_provider = token_provider
         self._timeout = httpx.Timeout(timeout_seconds)
+        self._max_retries = 2
 
     def request(
         self,
@@ -26,6 +28,7 @@ class ScalingoHTTPClient:
         params: Optional[Dict[str, Any]] = None,
         json_payload: Optional[Dict[str, Any]] = None,
         retry_on_401: bool = True,
+        attempt: int = 0,
     ) -> OperationResult[Dict[str, Any]]:
         base_url = settings.scalingo_region_urls.get(region.value)
         if not base_url:
@@ -57,6 +60,7 @@ class ScalingoHTTPClient:
             return OperationResult.ok({"raw": response.text})
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
+            request_id = exc.response.headers.get("x-request-id")
             if status_code == 401 and retry_on_401:
                 logger.info("401 from Scalingo API, refreshing token and retrying", endpoint=endpoint)
                 self._token_provider.refresh()
@@ -67,6 +71,26 @@ class ScalingoHTTPClient:
                     params=params,
                     json_payload=json_payload,
                     retry_on_401=False,
+                    attempt=attempt + 1,
+                )
+            if status_code in {429, 500, 502, 503, 504} and attempt < self._max_retries:
+                backoff_seconds = 0.35 * (2 ** attempt)
+                logger.warning(
+                    "Transient status from Scalingo API, retrying",
+                    endpoint=endpoint,
+                    status_code=status_code,
+                    request_id=request_id,
+                    backoff_seconds=backoff_seconds,
+                )
+                time.sleep(backoff_seconds)
+                return self.request(
+                    method,
+                    region,
+                    endpoint,
+                    params=params,
+                    json_payload=json_payload,
+                    retry_on_401=retry_on_401,
+                    attempt=attempt + 1,
                 )
             return OperationResult.fail(self._to_operation_error(exc))
         except httpx.TimeoutException:
@@ -97,6 +121,7 @@ class ScalingoHTTPClient:
     def _to_operation_error(self, exc: httpx.HTTPStatusError) -> OperationError:
         status_code = exc.response.status_code
         body = exc.response.text
+        request_id = exc.response.headers.get("x-request-id")
 
         if status_code == 401:
             reason = FailureReason.AUTH
@@ -106,6 +131,8 @@ class ScalingoHTTPClient:
             reason = FailureReason.CONFLICT
         elif status_code == 422:
             reason = FailureReason.VALIDATION
+        elif status_code == 429:
+            reason = FailureReason.TRANSIENT
         elif status_code >= 500:
             reason = FailureReason.TRANSIENT
         else:
@@ -115,5 +142,5 @@ class ScalingoHTTPClient:
             reason=reason,
             message=f"Scalingo API request failed with status {status_code}",
             status_code=status_code,
-            details={"response": body},
+            details={"response": body, "request_id": request_id},
         )

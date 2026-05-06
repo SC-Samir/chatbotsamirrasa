@@ -102,28 +102,23 @@ def restart_app_with_polling(scalingo_manager, app_name: str, region: str, scope
                 if containers_running > 0:
                     return True
     
-    # If no fast restart detected, use normal polling
-    result = scalingo_manager.wait_for_restart(app_name, region, max_wait_time, check_interval)
-    
-    # If normal polling fails, do a final simple check
-    if not result:
+    # Poll app and containers state until timeout.
+    deadline = time.time() + max_wait_time
+    result = False
+    while time.time() < deadline:
         app_info = scalingo_manager.get_app_status(app_name, region)
         if app_info:
             app_data = app_info.get("app", {})
             status = app_data.get("status")
-            
+
             if status == "running":
                 containers_info = scalingo_manager.get_containers_status(app_name, region)
                 if containers_info:
                     containers = containers_info.get("containers", [])
-                    # Use the 'state' field from the /ps endpoint
-                    containers_running = 0
-                    for container in containers:
-                        state = container.get("state", "unknown")
-                        if state == "running":
-                            containers_running += 1
-                    
+                    containers_running = sum(1 for container in containers if container.get("state", "unknown") == "running")
                     if containers_running > 0:
-                        return True
-    
+                        result = True
+                        break
+        time.sleep(check_interval)
+
     return result

@@ -1,7 +1,7 @@
 """
 Configuration centralisée pour l'application.
 """
-from typing import Dict
+from typing import Dict, Optional
 try:
     from pydantic.v1 import BaseSettings, validator
 except ImportError:  # pragma: no cover
@@ -20,14 +20,18 @@ class Settings(BaseSettings):
     
     # Redis
     redis_url: str = "redis://localhost:6379/0"
+    memory_session_ttl_seconds: int = 3600
+    memory_postgres_dsn: Optional[str] = None
+    database_url: Optional[str] = None
     
     # Rasa HTTP service
     rasa_url: str = "http://localhost:5005"
     rasa_timeout_ms: int = 3000
-    rasa_auth_token: str | None = None
-    nlu_expected_contract: str = "v2"
+    rasa_auth_token: Optional[str] = None
+    nlu_expected_contract: str = "v3"
     nlu_fallback_enable_regex: bool = True
     nlu_clarification_topk: int = 3
+    enable_legacy_intent_stack: bool = True
     
     # Application
     app_name: str = "ScalingoOps Agent"
@@ -50,6 +54,13 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+
+    @validator("memory_postgres_dsn", pre=True, always=True)
+    def default_memory_postgres_dsn(cls, v, values):
+        if v:
+            return v
+        # Reuse Scalingo Postgres addon URL if dedicated memory DSN is not provided.
+        return values.get("database_url") or None
 
 
 # Instance globale des settings

@@ -1,5 +1,6 @@
 """Application composition root."""
 from dataclasses import dataclass
+from typing import Optional
 
 import httpx
 
@@ -21,11 +22,11 @@ class AppComponents:
     apps_api: AppsAPI
     logs_service: LogsService
     deployment_service: DeploymentService
-    intent_handler_manager: IntentHandlerManager
-    websocket_handler: WebSocketHandler
+    intent_handler_manager: Optional[IntentHandlerManager]
+    websocket_handler: Optional[WebSocketHandler]
 
 
-def build_components() -> AppComponents:
+def build_components(enable_legacy_intent_stack: bool = True) -> AppComponents:
     rasa_client = RasaClient(
         base_url=settings.rasa_url,
         timeout_ms=settings.rasa_timeout_ms,
@@ -41,24 +42,26 @@ def build_components() -> AppComponents:
     deployment_service = DeploymentService(apps_api)
     websocket_helpers = WebSocketHelpers(apps_api)
 
-    gateway = apps_api
-    app_management_controller = AppManagementIntentController(
-        restart_app=RestartApp(gateway),
-        scale_app=ScaleApp(gateway),
-        delete_app=DeleteApp(gateway),
-        rename_app=RenameApp(gateway),
-        list_env_vars=ListEnvVars(gateway),
-        add_env_var=AddEnvVar(gateway),
-        presenter=WebSocketPresenter(),
-    )
-
-    intent_handler_manager = IntentHandlerManager(
-        deployment_service=deployment_service,
-        logs_service=logs_service,
-        websocket_helpers=websocket_helpers,
-        app_management_controller=app_management_controller,
-    )
-    websocket_handler = WebSocketHandler(rasa_client, intent_handler_manager)
+    intent_handler_manager: Optional[IntentHandlerManager] = None
+    websocket_handler: Optional[WebSocketHandler] = None
+    if enable_legacy_intent_stack:
+        gateway = apps_api
+        app_management_controller = AppManagementIntentController(
+            restart_app=RestartApp(gateway),
+            scale_app=ScaleApp(gateway),
+            delete_app=DeleteApp(gateway),
+            rename_app=RenameApp(gateway),
+            list_env_vars=ListEnvVars(gateway),
+            add_env_var=AddEnvVar(gateway),
+            presenter=WebSocketPresenter(),
+        )
+        intent_handler_manager = IntentHandlerManager(
+            deployment_service=deployment_service,
+            logs_service=logs_service,
+            websocket_helpers=websocket_helpers,
+            app_management_controller=app_management_controller,
+        )
+        websocket_handler = WebSocketHandler(rasa_client, intent_handler_manager)
 
     return AppComponents(
         rasa_client=rasa_client,
