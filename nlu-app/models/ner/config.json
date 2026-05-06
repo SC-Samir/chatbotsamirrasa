@@ -1,13 +1,13 @@
 {
+  "activation": "gelu",
   "architectures": [
-    "BertForTokenClassification"
+    "DistilBertForTokenClassification"
   ],
-  "attention_probs_dropout_prob": 0.1,
-  "classifier_dropout": null,
+  "attention_dropout": 0.1,
+  "dim": 768,
+  "dropout": 0.1,
   "dtype": "float32",
-  "hidden_act": "gelu",
-  "hidden_dropout_prob": 0.1,
-  "hidden_size": 128,
+  "hidden_dim": 3072,
   "id2label": {
     "0": "O",
     "1": "B-aliases",
@@ -40,7 +40,6 @@
     "28": "I-variable_value"
   },
   "initializer_range": 0.02,
-  "intermediate_size": 512,
   "label2id": {
     "B-aliases": 1,
     "B-app_name": 3,
@@ -72,15 +71,16 @@
     "I-variable_value": 28,
     "O": 0
   },
-  "layer_norm_eps": 1e-12,
   "max_position_embeddings": 512,
-  "model_type": "bert",
-  "num_attention_heads": 2,
-  "num_hidden_layers": 2,
+  "model_type": "distilbert",
+  "n_heads": 12,
+  "n_layers": 6,
+  "output_past": true,
   "pad_token_id": 0,
-  "position_embedding_type": "absolute",
+  "qa_dropout": 0.1,
+  "seq_classif_dropout": 0.2,
+  "sinusoidal_pos_embds": false,
+  "tie_weights_": true,
   "transformers_version": "4.57.6",
-  "type_vocab_size": 2,
-  "use_cache": true,
-  "vocab_size": 30522
+  "vocab_size": 119547
 }

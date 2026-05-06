@@ -27,10 +27,10 @@
     "variable_name",
     "variable_value"
   ],
-  "base_model": "prajjwal1/bert-tiny",
-  "epochs": 1,
+  "base_model": "distilbert-base-multilingual-cased",
+  "epochs": 5,
   "max_length": 128,
-  "num_samples": 207,
+  "num_samples": 278,
   "known_values": {
     "app_name": [
       "samir-test-francois-ai-trois",
@@ -47,9 +47,15 @@
       "production-api",
       "data-processor",
       "samirpgvector",
+      "payments-core",
+      "authz-service",
       "mon-app-test",
       "frontend-app",
+      "edge-gateway",
+      "worker-jobs",
       "new-service",
+      "chatbot-api",
+      "billing-api",
       "backend-api",
       "api-backend",
       "webapp2024",
@@ -67,7 +73,13 @@
       "https://github.com/Scalingo/sample-node-express",
       "https://github.com/Scalingo/sample-ruby-rails",
       "https://github.com/Scalingo/sample-go-martini",
+      "https://github.com/acme/payments-core",
+      "https://github.com/acme/authz-service",
+      "https://github.com/acme/edge-gateway",
       "https://github.com/company/frontend",
+      "https://github.com/acme/worker-jobs",
+      "https://github.com/acme/chatbot-api",
+      "https://github.com/acme/billing-api",
       "https://github.com/myorg/frontend",
       "https://github.com/user/pgvector",
       "https://github.com/myorg/backend",
@@ -81,6 +93,9 @@
       "https://github.com/org/auth"
     ],
     "git_ref": [
+      "release-candidate",
+      "release-2026",
+      "hotfix-login",
       "production",
       "staging",
       "develop",
@@ -95,6 +110,9 @@
       "web"
     ],
     "n": [
+      "300",
+      "200",
+      "150",
       "100",
       "50"
     ],
@@ -109,6 +127,9 @@
       "web"
     ],
     "container_amount": [
+      "9",
+      "8",
+      "7",
       "6",
       "5",
       "4",
@@ -123,7 +144,9 @@
       "L"
     ],
     "new_name": [
+      "edge-gateway-prod",
       "frontend-staging",
+      "billing-api-v2",
       "test-app-prod",
       "pgvector-prod",
       "notifications",
@@ -131,6 +154,7 @@
       "backend-test",
       "auth-service",
       "webapp-prod",
+      "jobs-worker",
       "my-new-app",
       "backend-v2",
       "my-app-v2",
@@ -143,8 +167,11 @@
     ],
     "variable_name": [
       "MAX_CONNECTIONS",
+      "FEATURE_FLAG_X",
       "WORKER_COUNT",
       "DATABASE_URL",
+      "RETRY_LIMIT",
+      "SENTRY_DSN",
       "SECRET_KEY",
       "JWT_SECRET",
       "REDIS_URL",
@@ -158,19 +185,27 @@
       "PORT"
     ],
     "variable_value": [
+      "https://examplePublicKey@o0.ingest.sentry.io/0",
       "postgresql://user:pass@host:5432/db",
       "redis://localhost:6379",
       "jwt-secret-key-456",
       "my-secret-key-123",
       "abc123def456",
       "production",
+      "enabled",
       "true",
       "info",
       "3600",
       "3000",
       "100",
       "30",
+      "5",
       "4"
     ]
+  },
+  "model_version": "2026-05-04-v3d",
+  "language_profile": "fr_en_mixed",
+  "calibration": {
+    "temperature": 1.0
   }
 }
