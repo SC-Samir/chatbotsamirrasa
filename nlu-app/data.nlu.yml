@@ -12,6 +12,23 @@ nlu:
       - deploy [scalintestrasa](app_name) on [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
       - deploy the app [scalintestrasa](app_name) on [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
       - deploy [scalintestrasa](app_name) to [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
+      - deploy [billing-api](app_name) on [osc-fr1](region) from [https://github.com/acme/billing-api](github_repo) branch [release-2026](git_ref)
+      - pls deploy [edge-gateway](app_name) to [osc-secnum-fr1](region) repo [https://github.com/acme/edge-gateway](github_repo) branch [hotfix-login](git_ref)
+      - can you push [worker-jobs](app_name) on [osc-fr1](region) using [https://github.com/acme/worker-jobs](github_repo) ref [main](git_ref)
+      - deploy existing app [payments-core](app_name) on [osc-fr1](region) from [https://github.com/acme/payments-core](github_repo) branch [main](git_ref)
+      - just deploy code to [authz-service](app_name) in [osc-secnum-fr1](region) repo [https://github.com/acme/authz-service](github_repo) ref [staging](git_ref)
+      - redeploy [chatbot-api](app_name) from [https://github.com/acme/chatbot-api](github_repo) on [osc-fr1](region) branch [release-candidate](git_ref)
+      - update deployment of [backend-api](app_name) in [osc-fr1](region) with [https://github.com/myorg/backend](github_repo) branch [develop](git_ref)
+      - ship new release to already-created app [notification-service](app_name) on [osc-fr1](region) from [https://github.com/acme/worker-jobs](github_repo) branch [main](git_ref)
+      - deploy current app [webapp2024](app_name) to [osc-fr1](region) with [https://github.com/user/repo](github_repo) branch [main](git_ref)
+      - run deployment only for [microservice-auth](app_name) on [osc-secnum-fr1](region) using [https://github.com/org/auth](github_repo) branch [production](git_ref)
+      - trigger deploy for existing [data-processor](app_name) in [osc-fr1](region) from [https://github.com/acme/worker-jobs](github_repo) ref [main](git_ref)
+      - deploy [billing-api](app_name) only, do not create it, on [osc-fr1](region) from [https://github.com/acme/billing-api](github_repo) branch [main](git_ref)
+      - app already exists, deploy [edge-gateway](app_name) in [osc-secnum-fr1](region) from [https://github.com/acme/edge-gateway](github_repo) branch [main](git_ref)
+      - no app creation, just deploy [payments-core](app_name) to [osc-fr1](region) using [https://github.com/acme/payments-core](github_repo) ref [main](git_ref)
+      - redeploy existing [authz-service](app_name) on [osc-fr1](region) with [https://github.com/acme/authz-service](github_repo) branch [staging](git_ref)
+      - push new code to existing app [worker-jobs](app_name) in [osc-fr1](region) from [https://github.com/acme/worker-jobs](github_repo) branch [develop](git_ref)
+      - deploy on existing app [chatbot-api](app_name) region [osc-fr1](region) repo [https://github.com/acme/chatbot-api](github_repo) ref [main](git_ref)
   - intent: create_and_deploy
     examples: |
       - create and deploy [mon-app-staging](app_name) to [osc-fr1](region) with [https://github.com/Scalingo/sample-node-express](github_repo) and branch [main](git_ref)
@@ -29,6 +46,23 @@ nlu:
       - create and deploy [scalintestrasa](app_name) to [osc-fr1](region) from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
       - create app [scalintestrasa](app_name) on [osc-fr1](region) and deploy from [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
       - create and deploy app [scalintestrasa](app_name) on [osc-fr1](region) using [https://github.com/Scalingo/sample-ruby-rails](github_repo) branch [main](git_ref)
+      - create and deploy [payments-core](app_name) in [osc-fr1](region) from [https://github.com/acme/payments-core](github_repo) branch [main](git_ref)
+      - setup app [authz-service](app_name) on [osc-secnum-fr1](region) and deploy [https://github.com/acme/authz-service](github_repo) branch [staging](git_ref)
+      - create app [chatbot-api](app_name) then deploy from [https://github.com/acme/chatbot-api](github_repo) ref [release-candidate](git_ref) on [osc-fr1](region)
+      - create a brand new app [billing-api](app_name) on [osc-fr1](region) then deploy [https://github.com/acme/billing-api](github_repo) branch [main](git_ref)
+      - provision and deploy [edge-gateway](app_name) in [osc-secnum-fr1](region) from [https://github.com/acme/edge-gateway](github_repo) branch [hotfix-login](git_ref)
+      - create app first then deploy [worker-jobs](app_name) on [osc-fr1](region) using [https://github.com/acme/worker-jobs](github_repo) ref [main](git_ref)
+      - make new app [notification-service](app_name) and deploy [https://github.com/acme/chatbot-api](github_repo) on [osc-fr1](region) branch [staging](git_ref)
+      - create application [data-processor](app_name) then release from [https://github.com/acme/worker-jobs](github_repo) in [osc-fr1](region) branch [develop](git_ref)
+      - spin up [webapp2024](app_name) in [osc-fr1](region) and deploy [https://github.com/user/newrepo](github_repo) branch [main](git_ref)
+      - launch new [payments-core](app_name) app on [osc-secnum-fr1](region) with [https://github.com/acme/payments-core](github_repo) branch [release-2026](git_ref)
+      - bootstrap [authz-service](app_name) app then deploy [https://github.com/acme/authz-service](github_repo) to [osc-fr1](region) ref [main](git_ref)
+      - app does not exist yet, create [billing-api](app_name) then deploy [https://github.com/acme/billing-api](github_repo) on [osc-fr1](region) branch [main](git_ref)
+      - create new app [edge-gateway](app_name) before deployment in [osc-secnum-fr1](region) from [https://github.com/acme/edge-gateway](github_repo) ref [main](git_ref)
+      - first create app [worker-jobs](app_name), then deploy [https://github.com/acme/worker-jobs](github_repo) to [osc-fr1](region) branch [develop](git_ref)
+      - provision fresh app [chatbot-api](app_name) and deploy from [https://github.com/acme/chatbot-api](github_repo) on [osc-fr1](region) branch [main](git_ref)
+      - create app [authz-service](app_name) from scratch then release [https://github.com/acme/authz-service](github_repo) in [osc-fr1](region) branch [staging](git_ref)
+      - new project: create [payments-core](app_name) and deploy [https://github.com/acme/payments-core](github_repo) to [osc-fr1](region) ref [main](git_ref)
   - intent: show_context
     examples: |
       - what do you remember?
@@ -38,6 +72,14 @@ nlu:
       - what do you remember?
       - display the context
       - context
+      - remind me what app and region you have
+      - show remembered app context
+      - what values are currently in memory
+      - tell me stored context fields
+      - show cached conversation context
+      - what app did I mention before
+      - display my current session context
+      - what deployment context do you track
   - intent: get_logs
     examples: |
       - show me the logs of [mon-app](app_name)
@@ -52,6 +94,17 @@ nlu:
       - display the last [100](n) lines of logs of [test-app](app_name)
       - streaming logs of [mon-app](app_name)
       - I want to stream the logs of [api-backend](app_name)
+      - show logs for [billing-api](app_name) on [osc-fr1](region)
+      - get me [200](n) lines of logs for [edge-gateway](app_name)
+      - tail logs of [worker-jobs](app_name) with [worker](filter)
+      - fetch logs for [payments-core](app_name) in [osc-fr1](region)
+      - read [300](n) lines of logs for [authz-service](app_name)
+      - show [150](n) log lines for [chatbot-api](app_name) with [web](filter)
+      - stream logs for [billing-api](app_name) with [worker](filter)
+      - can I see logs of [data-processor](app_name) on [osc-secnum-fr1](region)
+      - get application logs for [notification-service](app_name)
+      - show runtime logs of [webapp2024](app_name) with [web-1](filter)
+      - give me deployment logs for [edge-gateway](app_name)
   - intent: restart
     examples: |
       - restart [mon-app](app_name)
@@ -72,6 +125,9 @@ nlu:
       - restart [production-api-v2](app_name)
       - restart [microservice-auth](app_name) on [osc-secnum-fr1](region)
       - restart [user-service-prod](app_name) with [web](scope)
+      - reboot [billing-api](app_name) on [osc-fr1](region)
+      - restart service [edge-gateway](app_name) with [worker](scope)
+      - relaunch [worker-jobs](app_name) in [osc-secnum-fr1](region)
   - intent: scale
     examples: |
       - scale [my-app](app_name) [web](container_name) to [2](container_amount)
@@ -104,6 +160,9 @@ nlu:
       - scale [data-processor](app_name) [worker](container_name) to [6](container_amount)
       - scale [webapp2024](app_name) [web](container_name) to [2](container_amount)
       - scale [microservice-auth](app_name) [worker](container_name) to [1](container_amount)
+      - scale [billing-api](app_name) [web](container_name) to [7](container_amount)
+      - scale [edge-gateway](app_name) on [osc-fr1](region) [worker](container_name) to [8](container_amount)
+      - set [worker-jobs](app_name) [worker](container_name) to [9](container_amount) containers
   - intent: delete_app
     examples: |
       - delete [mon-app](app_name)
@@ -128,6 +187,9 @@ nlu:
       - delete application [api-backend](app_name)
       - destroy [frontend-app](app_name)
       - terminate [my-app](app_name)
+      - remove app [billing-api](app_name) on [osc-fr1](region)
+      - delete [edge-gateway](app_name) now
+      - terminate [worker-jobs](app_name) in [osc-secnum-fr1](region)
   - intent: rename_app
     examples: |
       - rename [mon-app](app_name) to [my-new-app](new_name)
@@ -158,6 +220,9 @@ nlu:
       - rename [webapp2024](app_name) to [webapp-prod](new_name)
       - rename [staging-frontend](app_name) to [frontend-staging](new_name)
       - rename [test-backend-v2](app_name) to [backend-test](new_name)
+      - rename [billing-api](app_name) to [billing-api-v2](new_name)
+      - change [edge-gateway](app_name) to [edge-gateway-prod](new_name)
+      - rename [worker-jobs](app_name) on [osc-fr1](region) to [jobs-worker](new_name)
   - intent: list_env_vars
     examples: |
       - show environment variables of [mon-app](app_name)
@@ -193,6 +258,9 @@ nlu:
       - show environment variables of [webapp2024](app_name)
       - display variables of [staging-frontend](app_name)
       - show env vars of [test-backend-v2](app_name)
+      - list env vars for [billing-api](app_name) on [osc-fr1](region)
+      - show variables of [edge-gateway](app_name) with [true](aliases)
+      - display env variables for [worker-jobs](app_name)
   - intent: add_env_var
     examples: |
       - add [RAILS_ENV](variable_name) = [production](variable_value) to [mon-app](app_name)
@@ -227,3 +295,6 @@ nlu:
       - add [TIMEOUT](variable_name) = [30](variable_value) to [webapp2024](app_name)
       - add [CACHE_TTL](variable_name) = [3600](variable_value) to [staging-frontend](app_name)
       - add [WORKER_COUNT](variable_name) = [4](variable_value) to [test-backend-v2](app_name)
+      - add [SENTRY_DSN](variable_name) = [https://examplePublicKey@o0.ingest.sentry.io/0](variable_value) to [billing-api](app_name)
+      - set [FEATURE_FLAG_X](variable_name) = [enabled](variable_value) for [edge-gateway](app_name)
+      - create [RETRY_LIMIT](variable_name) = [5](variable_value) for [worker-jobs](app_name) on [osc-fr1](region)

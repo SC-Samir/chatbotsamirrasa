@@ -13,6 +13,16 @@ from app.settings import settings
 
 ANNOTATED_RE = re.compile(r"\[([^\]]+)\]\(([^\)]+)\)")
 INTENT_FALLBACK = "nlu_fallback"
+APP_NAME_HINT_RE = re.compile(
+    r"\b(?:of|for|app|application)\s+([a-z0-9][a-z0-9-]{1,62})\b",
+    re.IGNORECASE,
+)
+REGION_HINT_RE = re.compile(r"\b(osc(?:\s*-\s*|-)fr1|osc(?:\s*-\s*|-)secnum(?:\s*-\s*|-)fr1)\b", re.IGNORECASE)
+NEW_NAME_HINT_RE = re.compile(r"\b(?:rename|change)\b.*?\bto\s+([a-z0-9][a-z0-9-]{1,62})\b", re.IGNORECASE)
+VAR_ASSIGN_RE = re.compile(
+    r"\b(?:add|set|create)\s+([A-Z][A-Z0-9_]{1,63})\s*=\s*(.+?)(?:\s+\b(?:to|for)\b\s+[a-z0-9][a-z0-9-]{1,62}(?:\s+\bon\b\s+osc(?:\s*-\s*|-)(?:fr1|secnum(?:\s*-\s*|-)fr1))?)?$",
+    re.IGNORECASE,
+)
 
 
 class NLUModel:
@@ -37,16 +47,19 @@ class NLUModel:
     def parse(self, text: str) -> Dict[str, Any]:
         normalized = text.strip()
         ranking = self._predict_intents(normalized)
-        top1 = ranking[0] if ranking else {"name": INTENT_FALLBACK, "confidence_raw": 0.0, "confidence_calibrated": 0.0}
+        top1 = ranking[0] if ranking else {"name": INTENT_FALLBACK, "confidence": 0.0, "confidence_calibrated": 0.0}
         top2 = ranking[1] if len(ranking) > 1 else {"confidence_calibrated": 0.0}
         decision = self._build_decision(top1, top2)
 
         entities = self._extract_entities(normalized)
+        entities = self._apply_rule_based_entity_overrides(normalized, entities)
+        hypotheses = ranking[: max(1, settings.intent_topk)]
+        quality_signals = self._build_quality_signals(hypotheses, decision)
         return {
-            "intent_top1": top1,
-            "intent_ranking": ranking[: max(1, settings.intent_topk)],
-            "decision": decision,
+            "hypotheses": hypotheses,
+            "final_decision": decision,
             "entities": entities,
+            "quality_signals": quality_signals,
             "text_normalized": normalized,
             "model_info": {
                 "version": self.model_version,
@@ -54,27 +67,251 @@ class NLUModel:
             },
         }
 
+    def _apply_rule_based_entity_overrides(self, text: str, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Patch critical entities from raw text when token classification returns broken wordpieces."""
+        app_name = self._extract_app_name_from_text(text)
+        region = self._extract_region_from_text(text)
+        new_name = self._extract_new_name_from_text(text)
+        variable_name, variable_value = self._extract_variable_assignment_from_text(text)
+        if not app_name:
+            app_name = None
+
+        updated = []
+        replaced_app = False
+        replaced_region = False
+        replaced_new_name = False
+        replaced_var_name = False
+        replaced_var_value = False
+        for ent in entities:
+            if ent.get("entity") == "app_name":
+                if not app_name:
+                    continue
+                updated.append(
+                    {
+                        "entity": "app_name",
+                        "value": app_name,
+                        "start": int(text.lower().find(app_name.lower())),
+                        "end": int(text.lower().find(app_name.lower()) + len(app_name)),
+                        "confidence": max(float(ent.get("confidence", 0.0)), 0.99),
+                        "normalized_value": app_name.lower(),
+                        "provenance": "rule",
+                    }
+                )
+                replaced_app = True
+            elif ent.get("entity") == "region" and region:
+                updated.append(
+                    {
+                        "entity": "region",
+                        "value": region,
+                        "start": int(text.lower().find(region.lower())),
+                        "end": int(text.lower().find(region.lower()) + len(region)),
+                        "confidence": max(float(ent.get("confidence", 0.0)), 0.99),
+                        "normalized_value": region.lower(),
+                        "provenance": "rule",
+                    }
+                )
+                replaced_region = True
+            elif ent.get("entity") == "new_name" and new_name:
+                updated.append(
+                    {
+                        "entity": "new_name",
+                        "value": new_name,
+                        "start": int(text.lower().find(new_name.lower())),
+                        "end": int(text.lower().find(new_name.lower()) + len(new_name)),
+                        "confidence": max(float(ent.get("confidence", 0.0)), 0.99),
+                        "normalized_value": new_name.lower(),
+                        "provenance": "rule",
+                    }
+                )
+                replaced_new_name = True
+            elif ent.get("entity") == "variable_name" and variable_name:
+                updated.append(
+                    {
+                        "entity": "variable_name",
+                        "value": variable_name,
+                        "start": int(text.find(variable_name)),
+                        "end": int(text.find(variable_name) + len(variable_name)),
+                        "confidence": max(float(ent.get("confidence", 0.0)), 0.99),
+                        "normalized_value": variable_name,
+                        "provenance": "rule",
+                    }
+                )
+                replaced_var_name = True
+            elif ent.get("entity") == "variable_value" and variable_value:
+                updated.append(
+                    {
+                        "entity": "variable_value",
+                        "value": variable_value,
+                        "start": int(text.lower().find(variable_value.lower())),
+                        "end": int(text.lower().find(variable_value.lower()) + len(variable_value)),
+                        "confidence": max(float(ent.get("confidence", 0.0)), 0.99),
+                        "normalized_value": variable_value,
+                        "provenance": "rule",
+                    }
+                )
+                replaced_var_value = True
+            else:
+                updated.append(ent)
+
+        if app_name and not replaced_app:
+            start = int(text.lower().find(app_name.lower()))
+            updated.append(
+                {
+                    "entity": "app_name",
+                    "value": app_name,
+                    "start": start,
+                    "end": start + len(app_name),
+                    "confidence": 0.99,
+                    "normalized_value": app_name.lower(),
+                    "provenance": "rule",
+                }
+            )
+        if region and not replaced_region:
+            start = int(text.lower().find(region.lower()))
+            updated.append(
+                {
+                    "entity": "region",
+                    "value": region,
+                    "start": start,
+                    "end": start + len(region),
+                    "confidence": 0.99,
+                    "normalized_value": region.lower(),
+                    "provenance": "rule",
+                }
+            )
+        if new_name and not replaced_new_name:
+            start = int(text.lower().find(new_name.lower()))
+            updated.append(
+                {
+                    "entity": "new_name",
+                    "value": new_name,
+                    "start": start,
+                    "end": start + len(new_name),
+                    "confidence": 0.99,
+                    "normalized_value": new_name.lower(),
+                    "provenance": "rule",
+                }
+            )
+        if variable_name and not replaced_var_name:
+            start = int(text.find(variable_name))
+            updated.append(
+                {
+                    "entity": "variable_name",
+                    "value": variable_name,
+                    "start": start,
+                    "end": start + len(variable_name),
+                    "confidence": 0.99,
+                    "normalized_value": variable_name,
+                    "provenance": "rule",
+                }
+            )
+        if variable_value and not replaced_var_value:
+            start = int(text.lower().find(variable_value.lower()))
+            updated.append(
+                {
+                    "entity": "variable_value",
+                    "value": variable_value,
+                    "start": start,
+                    "end": start + len(variable_value),
+                    "confidence": 0.99,
+                    "normalized_value": variable_value,
+                    "provenance": "rule",
+                }
+            )
+        return self._dedupe_entities(updated)
+
+    @staticmethod
+    def _extract_app_name_from_text(text: str) -> str | None:
+        match = APP_NAME_HINT_RE.search(text)
+        if not match:
+            return None
+        candidate = match.group(1).strip().lower()
+        if candidate in {"osc-fr1", "osc-secnum-fr1"}:
+            return None
+        return candidate
+
+    @staticmethod
+    def _extract_region_from_text(text: str) -> str | None:
+        match = REGION_HINT_RE.search(text)
+        if not match:
+            return None
+        return re.sub(r"\s+", "", match.group(1).lower())
+
+    @staticmethod
+    def _extract_new_name_from_text(text: str) -> str | None:
+        match = NEW_NAME_HINT_RE.search(text)
+        if not match:
+            return None
+        return match.group(1).strip().lower()
+
+    @staticmethod
+    def _extract_variable_assignment_from_text(text: str) -> tuple[str | None, str | None]:
+        match = VAR_ASSIGN_RE.search(text.strip())
+        if not match:
+            return None, None
+        var_name = match.group(1).strip().upper()
+        var_value = match.group(2).strip()
+        return var_name, var_value
+
+    @staticmethod
+    def _dedupe_entities(entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        deduped: List[Dict[str, Any]] = []
+        seen: set[tuple[str, str]] = set()
+        for ent in entities:
+            key = (str(ent.get("entity", "")), str(ent.get("normalized_value", ent.get("value", ""))).lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(ent)
+        return deduped
+
     @staticmethod
     def _build_decision(top1: Dict[str, Any], top2: Dict[str, Any]) -> Dict[str, Any]:
         margin = float(top1["confidence_calibrated"] - top2["confidence_calibrated"])
         min_conf_passed = float(top1["confidence_calibrated"]) >= settings.intent_min_confidence
         min_margin_passed = margin >= settings.intent_min_margin
 
-        accepted_intent = str(top1["name"])
+        action = "accept"
+        intent = str(top1["name"])
         reason = "accepted"
         if not min_conf_passed:
-            accepted_intent = INTENT_FALLBACK
+            action = "reject"
+            intent = INTENT_FALLBACK
             reason = "low_confidence"
         elif not min_margin_passed:
-            accepted_intent = INTENT_FALLBACK
+            action = "clarify"
+            intent = INTENT_FALLBACK
             reason = "low_margin"
 
         return {
-            "accepted_intent": accepted_intent,
+            "action": action,
+            "intent": intent,
             "reason": reason,
-            "min_conf_passed": bool(min_conf_passed),
-            "min_margin_passed": bool(min_margin_passed),
+            "policy": {
+                "min_confidence_threshold": settings.intent_min_confidence,
+                "min_margin_threshold": settings.intent_min_margin,
+                "min_conf_passed": bool(min_conf_passed),
+                "min_margin_passed": bool(min_margin_passed),
+            },
             "margin": margin,
+        }
+
+    @staticmethod
+    def _build_quality_signals(hypotheses: List[Dict[str, Any]], decision: Dict[str, Any]) -> Dict[str, Any]:
+        top1 = hypotheses[0] if hypotheses else {"confidence_calibrated": 0.0}
+        confidence = float(top1.get("confidence_calibrated", 0.0))
+        ambiguity = 1.0 - min(max(float(decision.get("margin", 0.0)), 0.0), 1.0)
+        ood_likelihood = 1.0 - confidence
+        if confidence >= 0.85:
+            band = "high"
+        elif confidence >= 0.6:
+            band = "medium"
+        else:
+            band = "low"
+        return {
+            "ambiguity_score": ambiguity,
+            "ood_likelihood": ood_likelihood,
+            "calibration_band": band,
         }
 
     def _calibrate_score(self, score: float) -> float:
@@ -86,9 +323,9 @@ class NLUModel:
         calibrated = 1.0 / (1.0 + math.exp(-(logit / self.temperature)))
         return float(calibrated)
 
-    def _predict_intents(self, text: str) -> List[Dict[str, float | str]]:
+    def _predict_intents(self, text: str) -> List[Dict[str, Any]]:
         results = self.intent_pipe(text, truncation=True, max_length=128, top_k=None)
-        ranking: List[Dict[str, float | str]] = []
+        ranking: List[Dict[str, Any]] = []
         for result in results:
             label = str(result.get("label", ""))
             intent_name = self._resolve_intent_label(label)
@@ -96,11 +333,17 @@ class NLUModel:
             ranking.append(
                 {
                     "name": intent_name,
-                    "confidence_raw": raw_score,
+                    "confidence": raw_score,
                     "confidence_calibrated": self._calibrate_score(raw_score),
-                }
+                    "rank": 0,
+                    "rationale_features": {
+                        "raw_confidence": raw_score,
+                    },
+                },
             )
         ranking.sort(key=lambda item: float(item["confidence_calibrated"]), reverse=True)
+        for idx, item in enumerate(ranking, start=1):
+            item["rank"] = idx
         return ranking
 
     def _resolve_intent_label(self, label: str) -> str:
@@ -136,8 +379,11 @@ class NLUModel:
                 {
                     "entity": entity_name,
                     "value": value,
+                    "start": int(ent.get("start", 0)),
+                    "end": int(ent.get("end", 0)),
                     "confidence": confidence,
                     "normalized_value": normalized_value,
+                    "provenance": "ml",
                 }
             )
 
@@ -146,7 +392,9 @@ class NLUModel:
     @staticmethod
     def _normalize_entity_value(entity_name: str, value: str) -> str:
         cleaned = re.sub(r"\s+", " ", value).strip()
-        if entity_name in {"region", "app_name"}:
+        if entity_name == "region":
+            return re.sub(r"\s*-\s*", "-", cleaned).lower()
+        if entity_name == "app_name":
             return cleaned.lower()
         return cleaned
 

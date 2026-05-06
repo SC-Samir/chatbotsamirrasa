@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
 from app.nlu import NLUModel, load_model
-from app.schemas import ParseRequest, ParseResponseV2
+from app.schemas import ParseRequest, ParseResponseV3
 from app.settings import settings
 
 _nlu_model: Optional[NLUModel] = None
@@ -56,7 +56,7 @@ def status() -> dict:
     return {"status": "ok", "model_path": settings.model_path}
 
 
-@app.post("/model/parse", response_model=ParseResponseV2)
+@app.post("/model/parse", response_model=ParseResponseV3)
 def parse(
     payload: ParseRequest,
     _: None = Depends(ensure_token),

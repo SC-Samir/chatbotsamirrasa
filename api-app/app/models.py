@@ -120,14 +120,18 @@ class WebSocketMessage(BaseModel):
 
 
 class IntentResponse(BaseModel):
-    """Réponse d'intent NLU v2."""
-    intent_top1: Dict[str, Any]
-    intent_ranking: List[Dict[str, Any]]
-    decision: Dict[str, Any]
+    """Réponse d'intent NLU v3."""
+    hypotheses: List[Dict[str, Any]]
+    final_decision: Dict[str, Any]
     entities: List[Dict[str, Any]]
+    quality_signals: Dict[str, Any]
     text_normalized: str
     model_info: Dict[str, Any]
 
     @property
     def accepted_intent(self) -> str:
-        return str(self.decision.get("accepted_intent", "nlu_fallback"))
+        return str(self.final_decision.get("intent", "nlu_fallback"))
+
+    @property
+    def decision_action(self) -> str:
+        return str(self.final_decision.get("action", "reject"))

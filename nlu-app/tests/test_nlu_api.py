@@ -63,19 +63,19 @@ def test_parse_endpoint(monkeypatch):
     client = _boot_test_app(model_path)
     response = client.post(
         "/model/parse",
-        headers={"X-NLU-Contract": "v2"},
+        headers={"X-NLU-Contract": "v3"},
         json={
             "text": "deploy samirpgvector on osc-fr1 from https://github.com/Scalingo/sample-ruby-rails branch main"
         },
     )
     assert response.status_code == 200
     body = response.json()
-    assert "intent_top1" in body
-    assert "intent_ranking" in body
-    assert "decision" in body
+    assert "hypotheses" in body
+    assert "final_decision" in body
     assert "entities" in body
-    assert isinstance(body["intent_top1"]["name"], str)
-    assert isinstance(body["intent_top1"]["confidence_calibrated"], float)
+    assert "quality_signals" in body
+    assert isinstance(body["hypotheses"][0]["name"], str)
+    assert isinstance(body["hypotheses"][0]["confidence_calibrated"], float)
 
 
 def test_parse_endpoint_rejects_missing_contract_header(monkeypatch):
@@ -95,10 +95,10 @@ def test_model_contract_and_entities():
 
     parsed = model.parse("rename mon-app to my-new-app")
     assert set(parsed.keys()) == {
-        "intent_top1",
-        "intent_ranking",
-        "decision",
+        "hypotheses",
+        "final_decision",
         "entities",
+        "quality_signals",
         "text_normalized",
         "model_info",
     }

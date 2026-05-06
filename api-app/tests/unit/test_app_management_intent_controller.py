@@ -42,19 +42,19 @@ async def test_controller_routes_restart_and_emits_structured_messages():
     websocket = FakeWebSocket()
     context = AppContext()
     intent = IntentResponse(
-        intent_top1={"name": "restart", "confidence_calibrated": 0.98, "confidence_raw": 0.95},
-        intent_ranking=[{"name": "restart", "confidence_calibrated": 0.98, "confidence_raw": 0.95}],
-        decision={
-            "accepted_intent": "restart",
+        hypotheses=[{"name": "restart", "confidence": 0.95, "confidence_calibrated": 0.98, "rank": 1, "rationale_features": {}}],
+        final_decision={
+            "action": "accept",
+            "intent": "restart",
             "reason": "accepted",
-            "min_conf_passed": True,
-            "min_margin_passed": True,
+            "policy": {"min_conf_passed": True, "min_margin_passed": True},
             "margin": 0.7,
         },
         entities=[
             {"entity": "app_name", "value": "demo-app"},
             {"entity": "region", "value": "osc-fr1"},
         ],
+        quality_signals={"ambiguity_score": 0.1, "ood_likelihood": 0.02, "calibration_band": "high"},
         text_normalized="restart demo-app",
         model_info={"version": "test", "language_profile": "fr_en_mixed"},
     )
@@ -86,16 +86,16 @@ async def test_controller_returns_validation_message_on_missing_params():
     websocket = FakeWebSocket()
     context = AppContext()
     intent = IntentResponse(
-        intent_top1={"name": "delete_app", "confidence_calibrated": 0.7, "confidence_raw": 0.7},
-        intent_ranking=[{"name": "delete_app", "confidence_calibrated": 0.7, "confidence_raw": 0.7}],
-        decision={
-            "accepted_intent": "delete_app",
+        hypotheses=[{"name": "delete_app", "confidence": 0.7, "confidence_calibrated": 0.7, "rank": 1, "rationale_features": {}}],
+        final_decision={
+            "action": "accept",
+            "intent": "delete_app",
             "reason": "accepted",
-            "min_conf_passed": True,
-            "min_margin_passed": True,
+            "policy": {"min_conf_passed": True, "min_margin_passed": True},
             "margin": 0.6,
         },
         entities=[],
+        quality_signals={"ambiguity_score": 0.4, "ood_likelihood": 0.3, "calibration_band": "medium"},
         text_normalized="delete",
         model_info={"version": "test", "language_profile": "fr_en_mixed"},
     )

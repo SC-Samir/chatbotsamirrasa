@@ -34,15 +34,15 @@ class RasaClient:
                 response.raise_for_status()
                 data = response.json()
                 required_keys = {
-                    "intent_top1",
-                    "intent_ranking",
-                    "decision",
+                    "hypotheses",
+                    "final_decision",
                     "entities",
+                    "quality_signals",
                     "text_normalized",
                     "model_info",
                 }
                 if not required_keys.issubset(set(data.keys())):
-                    raise ValueError("Invalid NLU v2 response payload")
+                    raise ValueError("Invalid NLU v3 response payload")
                 return data
             except (httpx.HTTPError, ValueError) as exc:
                 last_error = exc
