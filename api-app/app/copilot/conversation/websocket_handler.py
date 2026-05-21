@@ -80,6 +80,18 @@ INTENT_TO_COMMAND: Dict[str, str] = {
     "confirm": "confirm",
 }
 
+SUPPORTED_WS_COMMANDS = {
+    "apps.list", "apps.get", "apps.create", "apps.restart", "apps.delete", "apps.rename", "apps.set_force_https",
+    "apps.set_router_logs", "apps.set_sticky_session", "apps.change_project", "deployments.list", "deployments.details",
+    "deployments.output", "deployments.create", "deployments.rollback", "deployments.cache_reset", "autoscalers.list",
+    "autoscalers.create", "autoscalers.update", "autoscalers.delete", "events.list", "domains.list", "domains.create",
+    "domains.delete", "collaborators.list", "collaborators.invite", "collaborators.update_role", "collaborators.delete",
+    "log_drains.list", "log_drains.create", "log_drains.delete", "notifiers.list", "notifiers.create", "notifiers.update",
+    "notifiers.delete", "one_off.run", "containers.list", "containers.scale", "containers.stop", "containers.signal",
+    "projects.list", "env_vars.list", "env_vars.set", "env_vars.unset", "addons.list", "addons.add", "addons.remove",
+    "memory.show", "memory.forget", "memory.pin", "confirm",
+}
+
 
 class WebSocketV2Handler:
     def __init__(self, nlu: NLUAdapter, engine: CommandEngine, memory: MemoryService, presenter: WebSocketV2Presenter):
@@ -362,6 +374,11 @@ class WebSocketV2Handler:
     @staticmethod
     def _rule_based_fallback(text: str) -> tuple[Optional[str], Dict[str, str]]:
         s = text.strip()
+        explicit_command = re.search(r"\b([a-z_]+\.[a-z_]+)\b", s, flags=re.IGNORECASE)
+        if explicit_command:
+            candidate = explicit_command.group(1).lower()
+            if candidate in SUPPORTED_WS_COMMANDS:
+                return candidate, {}
         patterns = [
             (
                 r"(?:create\s+and\s+deploy|create\s+app\s+and\s+deploy|create\s+then\s+deploy)\s+([a-z0-9][a-z0-9-]*)\s+(?:to|on|in)\s+([a-z0-9-]+)\s+(?:with|from|using)\s+(https?://[^\s]+)(?:\s+(?:(?:on|from)\s+)?(?:branch|ref)\s+([A-Za-z0-9._/-]+))?",
@@ -374,6 +391,22 @@ class WebSocketV2Handler:
             (r"(?:list|show|get)\s+addons\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "addons.list", ("app_name", "region")),
             (r"(?:list|show|get)\s+containers\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "containers.list", ("app_name", "region")),
             (r"(?:show|get|list)\s+logs\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "legacy.show_logs", ("app_name", "region")),
+            (r"(?:list|show|get)\s+apps?\s+(?:on|in)\s+([a-z0-9-]+)", "apps.list", ("region",)),
+            (r"(?:get|show)\s+app\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.get", ("app_name", "region")),
+            (r"(?:delete|remove)\s+app\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.delete", ("app_name", "region")),
+            (r"(?:restart|redeploy)\s+app\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.restart", ("app_name", "region")),
+            (r"(?:list|show|get)\s+deployments?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "deployments.list", ("app_name", "region")),
+            (r"(?:show|get)\s+deployment\s+([A-Za-z0-9-]+)\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "deployments.details", ("deployment_id", "app_name", "region")),
+            (r"(?:show|get)\s+deployment\s+output\s+([A-Za-z0-9-]+)\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "deployments.output", ("deployment_id", "app_name", "region")),
+            (r"(?:reset|clear)\s+deployment\s+cache\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "deployments.cache_reset", ("app_name", "region")),
+            (r"(?:list|show|get)\s+domains?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "domains.list", ("app_name", "region")),
+            (r"(?:list|show|get)\s+events?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "events.list", ("app_name", "region")),
+            (r"(?:list|show|get)\s+collaborators?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "collaborators.list", ("app_name", "region")),
+            (r"(?:list|show|get)\s+log\s*drains?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "log_drains.list", ("app_name", "region")),
+            (r"(?:list|show|get)\s+notifiers?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "notifiers.list", ("app_name", "region")),
+            (r"(?:list|show|get)\s+autoscalers?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "autoscalers.list", ("app_name", "region")),
+            (r"(?:list|show|get)\s+projects?\s+(?:on|in)\s+([a-z0-9-]+)", "projects.list", ("region",)),
+            (r"(?:show|get|list)\s+memory\b", "memory.show", ()),
         ]
         for pattern, command, keys in patterns:
             m = re.search(pattern, s, flags=re.IGNORECASE)

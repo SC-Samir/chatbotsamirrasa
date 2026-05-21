@@ -28,3 +28,15 @@ def test_rule_based_fallback_matches_show_logs_command():
     assert command == "legacy.show_logs"
     assert entities["app_name"] == "samirtest4"
     assert entities["region"] == "osc-fr1"
+
+
+def test_rule_based_fallback_matches_explicit_ws_command():
+    command, entities = WebSocketV2Handler._rule_based_fallback("please run deployments.list for me")
+    assert command == "deployments.list"
+    assert entities == {}
+
+
+def test_rule_based_fallback_matches_apps_list_phrase():
+    command, entities = WebSocketV2Handler._rule_based_fallback("list apps on osc-fr1")
+    assert command == "apps.list"
+    assert entities["region"] == "osc-fr1"
