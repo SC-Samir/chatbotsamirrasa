@@ -166,6 +166,9 @@ class WebSocketV2Handler:
                     github_repo = str(raw_entities_for_command.get("github_repo") or "").strip()
                     source_url = str(raw_entities_for_command.get("source_url") or "").strip()
                     git_ref = str(raw_entities_for_command.get("git_ref") or "").strip()
+                    explicit_git_ref = self._extract_explicit_git_ref(text)
+                    if explicit_git_ref:
+                        git_ref = explicit_git_ref
                     if not git_ref or git_ref in {":", "-", ".", "/"}:
                         git_ref = "main"
                     entities_for_command = {
@@ -301,7 +304,7 @@ class WebSocketV2Handler:
         s = text.strip()
         patterns = [
             (
-                r"(?:create\s+and\s+deploy|create\s+app\s+and\s+deploy|create\s+then\s+deploy)\s+([a-z0-9][a-z0-9-]*)\s+(?:to|on|in)\s+([a-z0-9-]+)\s+(?:with|from|using)\s+(https?://[^\s]+)(?:\s+(?:branch|ref)\s+([A-Za-z0-9._/-]+))?",
+                r"(?:create\s+and\s+deploy|create\s+app\s+and\s+deploy|create\s+then\s+deploy)\s+([a-z0-9][a-z0-9-]*)\s+(?:to|on|in)\s+([a-z0-9-]+)\s+(?:with|from|using)\s+(https?://[^\s]+)(?:\s+(?:(?:on|from)\s+)?(?:branch|ref)\s+([A-Za-z0-9._/-]+))?",
                 "legacy.create_and_deploy",
                 ("app_name", "region", "github_repo", "git_ref"),
             ),
@@ -322,6 +325,14 @@ class WebSocketV2Handler:
                     entities[key] = val.lower() if key != "github_repo" else val
                 return command, entities
         return None, {}
+
+    @staticmethod
+    def _extract_explicit_git_ref(text: str) -> Optional[str]:
+        m = re.search(r"(?:^|\s)(?:(?:on|from)\s+)?(?:branch|ref)\s+([A-Za-z0-9._/-]+)(?:\s|$)", text, flags=re.IGNORECASE)
+        if not m:
+            return None
+        ref = m.group(1).strip().lower()
+        return ref or None
 
     @staticmethod
     def _detect_lang(text: str) -> str:
