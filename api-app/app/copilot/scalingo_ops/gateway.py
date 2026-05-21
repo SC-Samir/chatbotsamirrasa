@@ -64,7 +64,8 @@ class ScalingoOpsGateway:
         elif github_repo:
             repo = github_repo[:-4] if github_repo.endswith(".git") else github_repo
             repo = repo.rstrip("/")
-            payload["source_url"] = f"{repo}/archive/{git_ref}.tar.gz"
+            # GitHub archive URL format that works for both main/master and named refs.
+            payload["source_url"] = f"{repo}/archive/refs/heads/{git_ref}.tar.gz"
         result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/deployments", json_payload=payload)
         return result.value if result.success and result.value else {}
 
