@@ -31,7 +31,6 @@ class Settings(BaseSettings):
     nlu_expected_contract: str = "v3"
     nlu_fallback_enable_regex: bool = True
     nlu_clarification_topk: int = 3
-    enable_legacy_intent_stack: bool = True
     
     # Application
     app_name: str = "ScalingoOps Agent"

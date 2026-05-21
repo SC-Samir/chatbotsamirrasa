@@ -25,14 +25,11 @@ app = FastAPI(
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(LoggingMiddleware)
 
-components = build_components(enable_legacy_intent_stack=settings.enable_legacy_intent_stack)
+components = build_components()
 copilot_components = build_copilot_components()
 
 container.register_singleton(type(components.apps_api), components.apps_api)
 container.register_singleton(type(components.logs_service), components.logs_service)
-if settings.enable_legacy_intent_stack and components.intent_handler_manager and components.websocket_handler:
-    container.register_singleton(type(components.intent_handler_manager), components.intent_handler_manager)
-    container.register_singleton(type(components.websocket_handler), components.websocket_handler)
 
 templates = Jinja2Templates(directory="templates")
 
@@ -41,9 +38,8 @@ logger.info(
     app_name=settings.app_name,
     debug_mode=settings.debug,
     redis_url=settings.redis_url,
+    websocket_contract="ws.v2-only",
 )
-if not settings.enable_legacy_intent_stack:
-    logger.info("Legacy intent stack disabled", websocket_contract="ws.v2-only")
 
 
 @app.get("/")
