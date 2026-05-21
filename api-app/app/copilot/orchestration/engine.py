@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -14,10 +13,10 @@ Handler = Callable[[CommandRequest], CommandResult]
 @dataclass(frozen=True)
 class CommandMetadata:
     required_entities: Tuple[str, ...] = ()
-    risky: bool = False
     idempotent: bool = True
-    dry_run_support: bool = False
     requires_app_region: bool = False
+    is_mutating: bool = False
+    is_destructive: bool = False
 
 
 class CommandEngine:
@@ -27,6 +26,10 @@ class CommandEngine:
         self.registry: Dict[str, Handler] = {
             "apps.list": self._apps_list,
             "apps.get": self._apps_get,
+            "apps.create": self._apps_create,
+            "apps.delete": self._apps_delete,
+            "apps.rename": self._apps_rename,
+            "apps.restart": self._apps_restart,
             "apps.set_force_https": self._apps_set_force_https,
             "apps.set_router_logs": self._apps_set_router_logs,
             "apps.set_sticky_session": self._apps_set_sticky_session,
@@ -37,7 +40,9 @@ class CommandEngine:
             "deployments.list": self._deployments_list,
             "deployments.details": self._deployments_details,
             "deployments.output": self._deployments_output,
+            "deployments.create": self._deployments_create,
             "deployments.cache_reset": self._deployments_cache_reset,
+            "deployments.rollback": self._deployments_rollback,
             "autoscalers.list": self._autoscalers_list,
             "autoscalers.create": self._autoscalers_create,
             "autoscalers.update": self._autoscalers_update,
@@ -58,55 +63,81 @@ class CommandEngine:
             "notifiers.update": self._notifiers_update,
             "notifiers.delete": self._notifiers_delete,
             "one_off.run": self._one_off_run,
+            "containers.list": self._containers_list,
+            "containers.scale": self._containers_scale,
             "containers.stop": self._containers_stop,
             "containers.signal": self._containers_signal,
             "projects.list": self._projects_list,
+            "env_vars.list": self._env_vars_list,
+            "env_vars.set": self._env_vars_set,
+            "env_vars.unset": self._env_vars_unset,
+            "addons.list": self._addons_list,
+            "addons.add": self._addons_add,
+            "addons.remove": self._addons_remove,
             "confirm": self._confirm,
         }
         self.metadata: Dict[str, CommandMetadata] = {
             "apps.list": CommandMetadata(required_entities=("region",)),
             "apps.get": CommandMetadata(requires_app_region=True),
-            "apps.set_force_https": CommandMetadata(required_entities=("enabled",), requires_app_region=True, risky=True, idempotent=False),
-            "apps.set_router_logs": CommandMetadata(required_entities=("enabled",), requires_app_region=True, risky=True, idempotent=False),
-            "apps.set_sticky_session": CommandMetadata(required_entities=("enabled",), requires_app_region=True, risky=True, idempotent=False),
-            "apps.change_project": CommandMetadata(required_entities=("project_id",), requires_app_region=True, risky=True, idempotent=False),
+            "apps.create": CommandMetadata(required_entities=("app_name", "region"), idempotent=False, is_mutating=True),
+            "apps.delete": CommandMetadata(requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
+            "apps.rename": CommandMetadata(required_entities=("new_name",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "apps.restart": CommandMetadata(requires_app_region=True, idempotent=False, is_mutating=True),
+            "apps.set_force_https": CommandMetadata(required_entities=("enabled",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "apps.set_router_logs": CommandMetadata(required_entities=("enabled",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "apps.set_sticky_session": CommandMetadata(required_entities=("enabled",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "apps.change_project": CommandMetadata(required_entities=("project_id",), requires_app_region=True, idempotent=False, is_mutating=True),
             "memory.show": CommandMetadata(),
-            "memory.forget": CommandMetadata(required_entities=("memory_key",), idempotent=False),
-            "memory.pin": CommandMetadata(required_entities=("memory_key",), idempotent=False),
+            "memory.forget": CommandMetadata(required_entities=("memory_key",), idempotent=False, is_mutating=True),
+            "memory.pin": CommandMetadata(required_entities=("memory_key",), idempotent=False, is_mutating=True),
             "deployments.list": CommandMetadata(requires_app_region=True),
             "deployments.details": CommandMetadata(required_entities=("deployment_id",), requires_app_region=True),
             "deployments.output": CommandMetadata(required_entities=("deployment_id",), requires_app_region=True),
-            "deployments.cache_reset": CommandMetadata(requires_app_region=True, risky=True, idempotent=False),
+            "deployments.create": CommandMetadata(required_entities=("github_repo",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "deployments.cache_reset": CommandMetadata(requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
+            "deployments.rollback": CommandMetadata(required_entities=("release_id",), requires_app_region=True, idempotent=False, is_mutating=True),
             "autoscalers.list": CommandMetadata(requires_app_region=True),
-            "autoscalers.create": CommandMetadata(required_entities=("container_type", "min_containers", "max_containers", "metric", "target"), requires_app_region=True, risky=True, idempotent=False),
-            "autoscalers.update": CommandMetadata(required_entities=("autoscaler_id",), requires_app_region=True, risky=True, idempotent=False),
-            "autoscalers.delete": CommandMetadata(required_entities=("autoscaler_id",), requires_app_region=True, risky=True, idempotent=False),
+            "autoscalers.create": CommandMetadata(required_entities=("container_type", "min_containers", "max_containers", "metric", "target"), requires_app_region=True, idempotent=False, is_mutating=True),
+            "autoscalers.update": CommandMetadata(required_entities=("autoscaler_id",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "autoscalers.delete": CommandMetadata(required_entities=("autoscaler_id",), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
             "events.list": CommandMetadata(requires_app_region=True),
             "domains.list": CommandMetadata(requires_app_region=True),
-            "domains.create": CommandMetadata(required_entities=("domain",), requires_app_region=True, risky=True, idempotent=False),
-            "domains.delete": CommandMetadata(required_entities=("domain",), requires_app_region=True, risky=True, idempotent=False),
+            "domains.create": CommandMetadata(required_entities=("domain",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "domains.delete": CommandMetadata(required_entities=("domain",), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
             "collaborators.list": CommandMetadata(requires_app_region=True),
-            "collaborators.invite": CommandMetadata(required_entities=("email",), requires_app_region=True, risky=True, idempotent=False),
-            "collaborators.update_role": CommandMetadata(required_entities=("collaborator_id", "is_limited"), requires_app_region=True, risky=True, idempotent=False),
-            "collaborators.delete": CommandMetadata(required_entities=("collaborator_id",), requires_app_region=True, risky=True, idempotent=False),
+            "collaborators.invite": CommandMetadata(required_entities=("email",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "collaborators.update_role": CommandMetadata(required_entities=("collaborator_id", "is_limited"), requires_app_region=True, idempotent=False, is_mutating=True),
+            "collaborators.delete": CommandMetadata(required_entities=("collaborator_id",), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
             "log_drains.list": CommandMetadata(requires_app_region=True),
-            "log_drains.create": CommandMetadata(required_entities=("drain_type",), requires_app_region=True, risky=True, idempotent=False),
-            "log_drains.delete": CommandMetadata(required_entities=("drain_id",), requires_app_region=True, risky=True, idempotent=False),
+            "log_drains.create": CommandMetadata(required_entities=("drain_type",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "log_drains.delete": CommandMetadata(required_entities=("drain_id",), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
             "notifiers.list": CommandMetadata(requires_app_region=True),
-            "notifiers.create": CommandMetadata(required_entities=("notifier_name", "platform_id"), requires_app_region=True, risky=True, idempotent=False),
-            "notifiers.update": CommandMetadata(required_entities=("notifier_id",), requires_app_region=True, risky=True, idempotent=False),
-            "notifiers.delete": CommandMetadata(required_entities=("notifier_id",), requires_app_region=True, risky=True, idempotent=False),
-            "one_off.run": CommandMetadata(required_entities=("command",), requires_app_region=True, risky=True, idempotent=False),
-            "containers.stop": CommandMetadata(required_entities=("container_id",), requires_app_region=True, risky=True, idempotent=False),
-            "containers.signal": CommandMetadata(required_entities=("container_id", "signal"), requires_app_region=True, risky=True, idempotent=False),
+            "notifiers.create": CommandMetadata(required_entities=("notifier_name", "platform_id"), requires_app_region=True, idempotent=False, is_mutating=True),
+            "notifiers.update": CommandMetadata(required_entities=("notifier_id",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "notifiers.delete": CommandMetadata(required_entities=("notifier_id",), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
+            "one_off.run": CommandMetadata(required_entities=("command",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "containers.list": CommandMetadata(requires_app_region=True),
+            "containers.scale": CommandMetadata(required_entities=("container_type", "amount"), requires_app_region=True, idempotent=False, is_mutating=True),
+            "containers.stop": CommandMetadata(required_entities=("container_id",), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
+            "containers.signal": CommandMetadata(required_entities=("container_id", "signal"), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
             "projects.list": CommandMetadata(required_entities=("region",)),
+            "env_vars.list": CommandMetadata(requires_app_region=True),
+            "env_vars.set": CommandMetadata(required_entities=("env_name", "env_value"), requires_app_region=True, idempotent=False, is_mutating=True),
+            "env_vars.unset": CommandMetadata(required_entities=("env_name",), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
+            "addons.list": CommandMetadata(requires_app_region=True),
+            "addons.add": CommandMetadata(required_entities=("addon_id",), requires_app_region=True, idempotent=False, is_mutating=True),
+            "addons.remove": CommandMetadata(required_entities=("addon_id",), requires_app_region=True, idempotent=False, is_mutating=True, is_destructive=True),
             "confirm": CommandMetadata(required_entities=("confirm_token",), idempotent=False),
         }
+
+    def is_destructive(self, command: str) -> bool:
+        meta = self.metadata.get(command)
+        return bool(meta and meta.is_destructive)
 
     def execute(self, command: str, entities: Dict[str, Any], raw_text: str, context: CommandContext) -> CommandResult:
         req = CommandRequest(command=command, entities=entities, raw_text=raw_text, context=context)
         meta = self.metadata.get(command)
-        if meta and meta.risky and not entities.get("confirm_token"):
+        if meta and meta.is_destructive and not entities.get("confirm_token"):
             token = self.memory.issue_confirmation_token(
                 session_id=context.session_id,
                 command=command,
@@ -115,8 +146,8 @@ class CommandEngine:
             return CommandResult(
                 event_type="command.confirmation_required",
                 status="requires_confirmation",
-                human_message=f"High-risk action detected. Re-send with confirm token: {token}",
-                structured_payload={"confirm_token": token, "command": command},
+                human_message=f"Action preview: {self._preview_for(command, req)}. Destructive action, confirm with token {token}.",
+                structured_payload={"confirm_token": token, "command": command, "preview": self._preview_for(command, req)},
                 next_actions=[f"confirm {token}"],
                 risk_level="high",
             )
@@ -159,7 +190,7 @@ class CommandEngine:
             try:
                 self._resolve_app_region(req)
             except ValueError:
-                if not req.entities.get("app_name"):
+                if not req.entities.get("app_name") and not req.context.app_scope:
                     missing.append("app_name")
                 if not req.entities.get("region") and not req.context.region_scope:
                     missing.append("region")
@@ -180,6 +211,22 @@ class CommandEngine:
                 return False
         return None
 
+    def _preview_for(self, command: str, req: CommandRequest) -> str:
+        payload = {k: v for k, v in req.entities.items() if k not in {"confirm_token"}}
+        return f"{command} with {payload}"
+
+    def _with_mutation_preview(self, req: CommandRequest, result: CommandResult) -> CommandResult:
+        preview = self._preview_for(req.command, req)
+        return CommandResult(
+            event_type=result.event_type,
+            status=result.status,
+            human_message=f"Action preview: {preview}. {result.human_message}",
+            structured_payload={**result.structured_payload, "preview": preview},
+            next_actions=result.next_actions,
+            risk_level=result.risk_level,
+            action_id=result.action_id,
+        )
+
     def _apps_list(self, req: CommandRequest) -> CommandResult:
         region = str(req.entities.get("region") or req.context.region_scope or "")
         payload = self.gateway.apps_list(region)
@@ -190,13 +237,33 @@ class CommandEngine:
         payload = self.gateway.apps_get(app_name, region)
         return CommandResult("apps.get", "success", "Application loaded", payload)
 
+    def _apps_create(self, req: CommandRequest) -> CommandResult:
+        payload = self.gateway.apps_create(str(req.entities.get("app_name")), str(req.entities.get("region")))
+        return self._with_mutation_preview(req, CommandResult("apps.create", "success", "Application creation requested", payload))
+
+    def _apps_restart(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.apps_restart(app_name, region, scope=req.entities.get("scope"))
+        return self._with_mutation_preview(req, CommandResult("apps.restart", "success", "Application restart requested", payload))
+
+    def _apps_delete(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.apps_delete(app_name, region)
+        return self._with_mutation_preview(req, CommandResult("apps.delete", "success", "Application deletion requested", payload, risk_level="high"))
+
+    def _apps_rename(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        new_name = str(req.entities.get("new_name") or "")
+        payload = self.gateway.apps_update(app_name, region, {"name": new_name})
+        return self._with_mutation_preview(req, CommandResult("apps.rename", "success", "Application rename requested", payload))
+
     def _apps_update_field(self, req: CommandRequest, field_name: str, message: str) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         enabled = self._as_bool(req.entities.get("enabled"))
         if enabled is None:
             return CommandResult("apps.update", "warning", "enabled must be a boolean")
         payload = self.gateway.apps_update(app_name, region, {field_name: enabled})
-        return CommandResult("apps.update", "success", message, payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("apps.update", "success", message, payload))
 
     def _apps_set_force_https(self, req: CommandRequest) -> CommandResult:
         return self._apps_update_field(req, "force_https", "Application force_https updated")
@@ -211,7 +278,7 @@ class CommandEngine:
         app_name, region = self._resolve_app_region(req)
         project_id = str(req.entities.get("project_id") or "")
         payload = self.gateway.apps_update(app_name, region, {"project_id": project_id})
-        return CommandResult("apps.change_project", "success", "Application project updated", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("apps.change_project", "success", "Application project updated", payload))
 
     def _memory_show(self, req: CommandRequest) -> CommandResult:
         snap = self.memory.snapshot(req.context.user_id, req.context.session_id)
@@ -224,26 +291,28 @@ class CommandEngine:
 
     def _memory_forget(self, req: CommandRequest) -> CommandResult:
         key = str(req.entities.get("memory_key") or "")
-        if not key:
-            return CommandResult("memory.forget", "warning", "memory_key is required")
         ok = self.memory.forget(req.context.user_id, key)
-        return CommandResult(
-            event_type="memory.forget",
-            status="success" if ok else "warning",
-            human_message="Memory key removed" if ok else "Memory key not found",
-            structured_payload={"memory_key": key},
+        return self._with_mutation_preview(
+            req,
+            CommandResult(
+                event_type="memory.forget",
+                status="success" if ok else "warning",
+                human_message="Memory key removed" if ok else "Memory key not found",
+                structured_payload={"memory_key": key},
+            ),
         )
 
     def _memory_pin(self, req: CommandRequest) -> CommandResult:
         key = str(req.entities.get("memory_key") or "")
-        if not key:
-            return CommandResult("memory.pin", "warning", "memory_key is required")
         ok = self.memory.pin(req.context.user_id, key)
-        return CommandResult(
-            event_type="memory.pin",
-            status="success" if ok else "warning",
-            human_message="Memory key pinned" if ok else "Memory key not found",
-            structured_payload={"memory_key": key},
+        return self._with_mutation_preview(
+            req,
+            CommandResult(
+                event_type="memory.pin",
+                status="success" if ok else "warning",
+                human_message="Memory key pinned" if ok else "Memory key not found",
+                structured_payload={"memory_key": key},
+            ),
         )
 
     def _deployments_list(self, req: CommandRequest) -> CommandResult:
@@ -254,23 +323,35 @@ class CommandEngine:
     def _deployments_details(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         deployment_id = str(req.entities.get("deployment_id") or "")
-        if not deployment_id:
-            return CommandResult("deployments.details", "warning", "deployment_id is required")
         payload = self.gateway.deployment_details(app_name, region, deployment_id)
         return CommandResult("deployments.details", "success", "Deployment details loaded", payload)
 
     def _deployments_output(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         deployment_id = str(req.entities.get("deployment_id") or "")
-        if not deployment_id:
-            return CommandResult("deployments.output", "warning", "deployment_id is required")
         payload = self.gateway.deployment_output(app_name, region, deployment_id)
         return CommandResult("deployments.output", "success", "Deployment output loaded", payload)
+
+    def _deployments_create(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.deployments_create(
+            app_name,
+            region,
+            source_url=str(req.entities.get("source_url") or ""),
+            github_repo=str(req.entities.get("github_repo") or ""),
+            git_ref=str(req.entities.get("git_ref") or "main"),
+        )
+        return self._with_mutation_preview(req, CommandResult("deployments.create", "success", "Deployment requested", payload))
 
     def _deployments_cache_reset(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         payload = self.gateway.deployment_cache_reset(app_name, region)
-        return CommandResult("deployments.cache_reset", "success", "Deployment cache reset requested", payload)
+        return self._with_mutation_preview(req, CommandResult("deployments.cache_reset", "success", "Deployment cache reset requested", payload, risk_level="high"))
+
+    def _deployments_rollback(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.deployments_rollback(app_name, region, str(req.entities.get("release_id")))
+        return self._with_mutation_preview(req, CommandResult("deployments.rollback", "success", "Rollback requested", payload))
 
     def _autoscalers_list(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
@@ -290,7 +371,7 @@ class CommandEngine:
             }
         }
         result = self.gateway.autoscalers_create(app_name, region, payload)
-        return CommandResult("autoscalers.create", "success", "Autoscaler created", result, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("autoscalers.create", "success", "Autoscaler created", result))
 
     def _autoscalers_update(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
@@ -301,17 +382,23 @@ class CommandEngine:
                 patch[key] = req.entities.get(key)
         payload = {"autoscaler": patch}
         result = self.gateway.autoscalers_update(app_name, region, autoscaler_id, payload)
-        return CommandResult("autoscalers.update", "success", "Autoscaler updated", result, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("autoscalers.update", "success", "Autoscaler updated", result))
 
     def _autoscalers_delete(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         autoscaler_id = str(req.entities.get("autoscaler_id") or "")
         payload = self.gateway.autoscalers_delete(app_name, region, autoscaler_id)
-        return CommandResult("autoscalers.delete", "success", f"Autoscaler {autoscaler_id} delete requested", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("autoscalers.delete", "success", f"Autoscaler {autoscaler_id} delete requested", payload, risk_level="high"))
 
     def _events_list(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
-        payload = self.gateway.events_list(app_name, region)
+        payload = self.gateway.events_list(
+            app_name,
+            region,
+            page=req.entities.get("page"),
+            per_page=req.entities.get("per_page"),
+            event_type=req.entities.get("event_type"),
+        )
         return CommandResult("events.list", "success", "Events loaded", payload)
 
     def _domains_list(self, req: CommandRequest) -> CommandResult:
@@ -328,13 +415,13 @@ class CommandEngine:
         if "letsencrypt_enabled" in req.entities:
             domain_payload["letsencrypt_enabled"] = bool(req.entities.get("letsencrypt_enabled"))
         payload = self.gateway.domains_create(app_name, region, {"domain": domain_payload})
-        return CommandResult("domains.create", "success", f"Domain {domain_name} creation requested", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("domains.create", "success", f"Domain {domain_name} creation requested", payload))
 
     def _domains_delete(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         domain = str(req.entities.get("domain") or "")
         payload = self.gateway.domains_delete(app_name, region, domain)
-        return CommandResult("domains.delete", "success", f"Domain {domain} delete requested", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("domains.delete", "success", f"Domain {domain} delete requested", payload, risk_level="high"))
 
     def _collaborators_list(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
@@ -350,7 +437,7 @@ class CommandEngine:
             }
         }
         result = self.gateway.collaborators_invite(app_name, region, payload)
-        return CommandResult("collaborators.invite", "success", "Collaborator invitation requested", result, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("collaborators.invite", "success", "Collaborator invitation requested", result))
 
     def _collaborators_update_role(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
@@ -360,19 +447,13 @@ class CommandEngine:
             return CommandResult("collaborators.update_role", "warning", "is_limited must be a boolean")
         payload = {"collaborator": {"is_limited": is_limited}}
         result = self.gateway.collaborators_update(app_name, region, collaborator_id, payload)
-        return CommandResult("collaborators.update_role", "success", "Collaborator role updated", result, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("collaborators.update_role", "success", "Collaborator role updated", result))
 
     def _collaborators_delete(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         collaborator_id = str(req.entities.get("collaborator_id") or "")
         payload = self.gateway.collaborators_delete(app_name, region, collaborator_id)
-        return CommandResult(
-            "collaborators.delete",
-            "success",
-            f"Collaborator {collaborator_id} removal requested",
-            payload,
-            risk_level="high",
-        )
+        return self._with_mutation_preview(req, CommandResult("collaborators.delete", "success", f"Collaborator {collaborator_id} removal requested", payload, risk_level="high"))
 
     def _log_drains_list(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
@@ -390,13 +471,13 @@ class CommandEngine:
             }
         }
         payload = self.gateway.log_drains_create(app_name, region, drain_payload)
-        return CommandResult("log_drains.create", "success", "Log drain creation requested", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("log_drains.create", "success", "Log drain creation requested", payload))
 
     def _log_drains_delete(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         drain_id = str(req.entities.get("drain_id") or "")
         payload = self.gateway.log_drains_delete(app_name, region, drain_id)
-        return CommandResult("log_drains.delete", "success", f"Log drain {drain_id} delete requested", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("log_drains.delete", "success", f"Log drain {drain_id} delete requested", payload, risk_level="high"))
 
     def _notifiers_list(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
@@ -413,7 +494,7 @@ class CommandEngine:
             }
         }
         result = self.gateway.notifiers_create(app_name, region, payload)
-        return CommandResult("notifiers.create", "success", "Notifier creation requested", result, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("notifiers.create", "success", "Notifier creation requested", result))
 
     def _notifiers_update(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
@@ -421,46 +502,89 @@ class CommandEngine:
         patch = dict(req.entities.get("notifier_patch") or {})
         payload = {"notifier": patch}
         result = self.gateway.notifiers_update(app_name, region, notifier_id, payload)
-        return CommandResult("notifiers.update", "success", "Notifier updated", result, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("notifiers.update", "success", "Notifier updated", result))
 
     def _notifiers_delete(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         notifier_id = str(req.entities.get("notifier_id") or "")
         payload = self.gateway.notifiers_delete(app_name, region, notifier_id)
-        return CommandResult("notifiers.delete", "success", f"Notifier {notifier_id} delete requested", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("notifiers.delete", "success", f"Notifier {notifier_id} delete requested", payload, risk_level="high"))
 
     def _one_off_run(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         command = str(req.entities.get("command") or "")
-        payload = self.gateway.one_off_run(
+        payload = self.gateway.one_off_run(app_name, region, command, size=req.entities.get("size"), detached=req.entities.get("detached"), env=req.entities.get("env"))
+        return self._with_mutation_preview(req, CommandResult("one_off.run", "success", "One-off execution requested", payload))
+
+    def _containers_list(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.containers_list(app_name, region)
+        return CommandResult("containers.list", "success", "Containers loaded", payload)
+
+    def _containers_scale(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.containers_scale(
             app_name,
             region,
-            command,
+            container_type=str(req.entities.get("container_type")),
+            amount=int(req.entities.get("amount")),
             size=req.entities.get("size"),
-            detached=req.entities.get("detached"),
-            env=req.entities.get("env"),
         )
-        return CommandResult("one_off.run", "success", "One-off execution requested", payload)
+        return self._with_mutation_preview(req, CommandResult("containers.scale", "success", "Container scaling requested", payload))
 
     def _containers_stop(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         container_id = str(req.entities.get("container_id") or "")
         payload = self.gateway.containers_stop(app_name, region, container_id)
-        return CommandResult("containers.stop", "success", f"Container {container_id} stop requested", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("containers.stop", "success", f"Container {container_id} stop requested", payload, risk_level="high"))
 
     def _containers_signal(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         container_id = str(req.entities.get("container_id") or "")
         signal = str(req.entities.get("signal") or "")
         payload = self.gateway.containers_signal(app_name, region, container_id, signal)
-        return CommandResult("containers.signal", "success", f"Signal {signal} sent to {container_id}", payload, risk_level="high")
+        return self._with_mutation_preview(req, CommandResult("containers.signal", "success", f"Signal {signal} sent to {container_id}", payload, risk_level="high"))
 
     def _projects_list(self, req: CommandRequest) -> CommandResult:
         region = str(req.entities.get("region") or req.context.region_scope or "")
-        if not region:
-            return CommandResult("projects.list", "warning", "region is required")
         payload = self.gateway.projects_list(region)
         return CommandResult("projects.list", "success", "Projects loaded", payload)
+
+    def _env_vars_list(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.env_vars_list(app_name, region, aliases=bool(req.entities.get("aliases", True)))
+        return CommandResult("env_vars.list", "success", "Environment variables loaded", payload)
+
+    def _env_vars_set(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.env_vars_set(app_name, region, str(req.entities.get("env_name")), str(req.entities.get("env_value")))
+        return self._with_mutation_preview(req, CommandResult("env_vars.set", "success", "Environment variable set", payload))
+
+    def _env_vars_unset(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.env_vars_unset(app_name, region, str(req.entities.get("env_name")))
+        return self._with_mutation_preview(req, CommandResult("env_vars.unset", "success", "Environment variable unset requested", payload, risk_level="high"))
+
+    def _addons_list(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.addons_list(app_name, region)
+        return CommandResult("addons.list", "success", "Addons loaded", payload)
+
+    def _addons_add(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.addons_add(
+            app_name,
+            region,
+            addon_id=str(req.entities.get("addon_id")),
+            plan=str(req.entities.get("addon_plan") or ""),
+            options=req.entities.get("addon_options") if isinstance(req.entities.get("addon_options"), dict) else None,
+        )
+        return self._with_mutation_preview(req, CommandResult("addons.add", "success", "Addon provisioning requested", payload))
+
+    def _addons_remove(self, req: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(req)
+        payload = self.gateway.addons_remove(app_name, region, str(req.entities.get("addon_id")))
+        return self._with_mutation_preview(req, CommandResult("addons.remove", "success", "Addon removal requested", payload, risk_level="high"))
 
     def _confirm(self, req: CommandRequest) -> CommandResult:
         token = str(req.entities.get("confirm_token") or "")

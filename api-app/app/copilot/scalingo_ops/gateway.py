@@ -21,6 +21,10 @@ class ScalingoOpsGateway:
         result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}")
         return result.value if result.success and result.value else {}
 
+    def apps_create(self, app_name: str, region: str) -> Dict[str, Any]:
+        result = self.client.request("POST", self._region(region), "/v1/apps", json_payload={"app": {"name": app_name}})
+        return result.value if result.success and result.value else {}
+
     def apps_update(self, app_name: str, region: str, app_patch: Dict[str, Any]) -> Dict[str, Any]:
         payload = {"app": app_patch}
         result = self.client.request(
@@ -31,6 +35,15 @@ class ScalingoOpsGateway:
             json_payload=payload,
         )
         return result.value if result.success and result.value else {}
+
+    def apps_delete(self, app_name: str, region: str) -> Dict[str, Any]:
+        result = self.client.request("DELETE", self._region(region), f"/v1/apps/{app_name}")
+        return result.value if result.success and result.value else {"accepted": result.success}
+
+    def apps_restart(self, app_name: str, region: str, scope: Optional[list[str]] = None) -> Dict[str, Any]:
+        payload = {"scope": scope} if scope else None
+        result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/restart", json_payload=payload)
+        return result.value if result.success and result.value else {"accepted": result.success}
 
     def deployments_list(self, app_name: str, region: str) -> Dict[str, Any]:
         result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/deployments")
@@ -43,6 +56,21 @@ class ScalingoOpsGateway:
     def deployment_output(self, app_name: str, region: str, deployment_id: str) -> Dict[str, Any]:
         result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/deployments/{deployment_id}/output")
         return result.value if result.success and result.value else {}
+
+    def deployments_create(self, app_name: str, region: str, source_url: str, github_repo: str, git_ref: str) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"git_ref": git_ref}
+        if source_url:
+            payload["source_url"] = source_url
+        elif github_repo:
+            repo = github_repo[:-4] if github_repo.endswith(".git") else github_repo
+            repo = repo.rstrip("/")
+            payload["source_url"] = f"{repo}/archive/{git_ref}.tar.gz"
+        result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/deployments", json_payload=payload)
+        return result.value if result.success and result.value else {}
+
+    def deployments_rollback(self, app_name: str, region: str, release_id: str) -> Dict[str, Any]:
+        result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/releases/{release_id}/rollback")
+        return result.value if result.success and result.value else {"accepted": result.success}
 
     def deployment_cache_reset(self, app_name: str, region: str) -> Dict[str, Any]:
         result = self.client.request("DELETE", self._region(region), f"/v1/apps/{app_name}/cache")
@@ -85,31 +113,25 @@ class ScalingoOpsGateway:
         return result.value if result.success and result.value else {}
 
     def collaborators_update(self, app_name: str, region: str, collaborator_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        result = self.client.request(
-            "PATCH",
-            self._region(region),
-            f"/v1/apps/{app_name}/collaborators/{collaborator_id}",
-            json_payload=payload,
-        )
+        result = self.client.request("PATCH", self._region(region), f"/v1/apps/{app_name}/collaborators/{collaborator_id}", json_payload=payload)
         return result.value if result.success and result.value else {}
 
     def collaborators_delete(self, app_name: str, region: str, collaborator_id: str) -> Dict[str, Any]:
         result = self.client.request("DELETE", self._region(region), f"/v1/apps/{app_name}/collaborators/{collaborator_id}")
         return result.value if result.success and result.value else {"accepted": result.success}
 
-    def events_list(self, app_name: str, region: str) -> Dict[str, Any]:
-        result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/events")
+    def events_list(self, app_name: str, region: str, page: Optional[int] = None, per_page: Optional[int] = None, event_type: Optional[str] = None) -> Dict[str, Any]:
+        params: Dict[str, Any] = {}
+        if page is not None:
+            params["page"] = page
+        if per_page is not None:
+            params["per_page"] = per_page
+        if event_type:
+            params["type"] = event_type
+        result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/events", params=params or None)
         return result.value if result.success and result.value else {"events": []}
 
-    def one_off_run(
-        self,
-        app_name: str,
-        region: str,
-        command: str,
-        size: Optional[str] = None,
-        detached: Optional[bool] = None,
-        env: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+    def one_off_run(self, app_name: str, region: str, command: str, size: Optional[str] = None, detached: Optional[bool] = None, env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"command": command}
         if size:
             payload["size"] = size
@@ -120,18 +142,23 @@ class ScalingoOpsGateway:
         result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/run", json_payload=payload)
         return result.value if result.success and result.value else {}
 
+    def containers_list(self, app_name: str, region: str) -> Dict[str, Any]:
+        result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/ps")
+        return result.value if result.success and result.value else {"containers": []}
+
+    def containers_scale(self, app_name: str, region: str, container_type: str, amount: int, size: Optional[str] = None) -> Dict[str, Any]:
+        container: Dict[str, Any] = {"name": container_type, "amount": amount}
+        if size:
+            container["size"] = size
+        result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/scale", json_payload={"containers": [container]})
+        return result.value if result.success and result.value else {"accepted": result.success}
+
     def containers_stop(self, app_name: str, region: str, container_id: str) -> Dict[str, Any]:
         result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/containers/{container_id}/stop")
         return result.value if result.success and result.value else {"accepted": result.success}
 
     def containers_signal(self, app_name: str, region: str, container_id: str, signal: str) -> Dict[str, Any]:
-        payload = {"signal": signal}
-        result = self.client.request(
-            "POST",
-            self._region(region),
-            f"/v1/apps/{app_name}/containers/{container_id}/kill",
-            json_payload=payload,
-        )
+        result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/containers/{container_id}/kill", json_payload={"signal": signal})
         return result.value if result.success and result.value else {"accepted": result.success}
 
     def log_drains_list(self, app_name: str, region: str) -> Dict[str, Any]:
@@ -155,16 +182,41 @@ class ScalingoOpsGateway:
         return result.value if result.success and result.value else {}
 
     def notifiers_update(self, app_name: str, region: str, notifier_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        result = self.client.request(
-            "PATCH",
-            self._region(region),
-            f"/v1/apps/{app_name}/notifiers/{notifier_id}",
-            json_payload=payload,
-        )
+        result = self.client.request("PATCH", self._region(region), f"/v1/apps/{app_name}/notifiers/{notifier_id}", json_payload=payload)
         return result.value if result.success and result.value else {}
 
     def notifiers_delete(self, app_name: str, region: str, notifier_id: str) -> Dict[str, Any]:
         result = self.client.request("DELETE", self._region(region), f"/v1/apps/{app_name}/notifiers/{notifier_id}")
+        return result.value if result.success and result.value else {"accepted": result.success}
+
+    def env_vars_list(self, app_name: str, region: str, aliases: bool = True) -> Dict[str, Any]:
+        result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/variables", params={"aliases": aliases})
+        return result.value if result.success and result.value else {"variables": []}
+
+    def env_vars_set(self, app_name: str, region: str, name: str, value: str) -> Dict[str, Any]:
+        payload = {"variable": {"name": name, "value": value}}
+        result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/variables", json_payload=payload)
+        return result.value if result.success and result.value else {}
+
+    def env_vars_unset(self, app_name: str, region: str, name: str) -> Dict[str, Any]:
+        result = self.client.request("DELETE", self._region(region), f"/v1/apps/{app_name}/variables/{name}")
+        return result.value if result.success and result.value else {"accepted": result.success}
+
+    def addons_list(self, app_name: str, region: str) -> Dict[str, Any]:
+        result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/addons")
+        return result.value if result.success and result.value else {"addons": []}
+
+    def addons_add(self, app_name: str, region: str, addon_id: str, plan: str = "", options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        addon: Dict[str, Any] = {"addon_id": addon_id}
+        if plan:
+            addon["plan"] = plan
+        if options:
+            addon["options"] = options
+        result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/addons", json_payload={"addon": addon})
+        return result.value if result.success and result.value else {}
+
+    def addons_remove(self, app_name: str, region: str, addon_id: str) -> Dict[str, Any]:
+        result = self.client.request("DELETE", self._region(region), f"/v1/apps/{app_name}/addons/{addon_id}")
         return result.value if result.success and result.value else {"accepted": result.success}
 
     def projects_list(self, region: str) -> Dict[str, Any]:

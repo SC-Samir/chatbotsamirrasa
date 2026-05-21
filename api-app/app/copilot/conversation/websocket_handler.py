@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -17,8 +18,21 @@ logger = StructuredLogger("ws_v2")
 
 
 INTENT_TO_COMMAND: Dict[str, str] = {
+    # Legacy intent aliases
+    "deploy": "deployments.create",
+    "create_and_deploy": "legacy.create_and_deploy",
+    "restart": "apps.restart",
+    "scale": "containers.scale",
+    "delete_app": "apps.delete",
+    "rename_app": "apps.rename",
+    "list_env_vars": "env_vars.list",
+    "add_env_var": "env_vars.set",
+    "show_context": "memory.show",
+    # ws.v2 intents
     "list_apps": "apps.list",
     "get_app": "apps.get",
+    "create_app": "apps.create",
+    "restart_app": "apps.restart",
     "set_force_https": "apps.set_force_https",
     "set_router_logs": "apps.set_router_logs",
     "set_sticky_session": "apps.set_sticky_session",
@@ -29,7 +43,9 @@ INTENT_TO_COMMAND: Dict[str, str] = {
     "list_deployments": "deployments.list",
     "deployment_details": "deployments.details",
     "deployment_output": "deployments.output",
+    "create_deployment": "deployments.create",
     "reset_deployment_cache": "deployments.cache_reset",
+    "rollback_deployment": "deployments.rollback",
     "list_autoscalers": "autoscalers.list",
     "create_autoscaler": "autoscalers.create",
     "update_autoscaler": "autoscalers.update",
@@ -50,9 +66,17 @@ INTENT_TO_COMMAND: Dict[str, str] = {
     "update_notifier": "notifiers.update",
     "delete_notifier": "notifiers.delete",
     "run_one_off": "one_off.run",
+    "list_containers": "containers.list",
+    "scale_container": "containers.scale",
     "stop_container": "containers.stop",
     "signal_container": "containers.signal",
     "list_projects": "projects.list",
+    "list_env_vars": "env_vars.list",
+    "set_env_var": "env_vars.set",
+    "unset_env_var": "env_vars.unset",
+    "list_addons": "addons.list",
+    "add_addon": "addons.add",
+    "remove_addon": "addons.remove",
     "confirm": "confirm",
 }
 
@@ -71,12 +95,13 @@ class WebSocketV2Handler:
 
         await self.presenter.emit_system(
             websocket,
-            "Connected to Scalingo Copilot ws.v2. Ask for deployment, autoscalers, memory or ops actions.",
+            self._msg("Connected to Scalingo Copilot ws.v2.", "Connecte au Copilot Scalingo ws.v2.", "en"),
         )
 
         try:
             while True:
                 text = await websocket.receive_text()
+                lang = self._detect_lang(text)
                 interpretation = await self.nlu.interpret(text)
 
                 merged_entities = self.memory.merge_entities(session_id, interpretation.entities.values)
@@ -87,35 +112,106 @@ class WebSocketV2Handler:
                         confidence=interpretation.memory_hints.confidence,
                     )
 
-                if interpretation.decision.action in {"clarify", "reject"}:
+                command = self._resolve_command(interpretation.decision.intent, text)
+                if not command:
+                    command, fallback_entities = self._rule_based_fallback(text)
+                    if fallback_entities:
+                        merged_entities.update(fallback_entities)
+
+                if interpretation.decision.action in {"clarify", "reject"} and not command:
                     suggestions = [c.name for c in interpretation.candidates[:3]]
                     await self.presenter.emit_system(
                         websocket,
-                        (
-                            "Need clarification. Please include app_name and region when relevant. "
-                            f"Candidate intents: {', '.join(suggestions) if suggestions else 'none'}"
+                        self._msg(
+                            f"Need clarification. Candidate intents: {', '.join(suggestions) if suggestions else 'none'}",
+                            f"J'ai besoin de clarification. Intentions candidates: {', '.join(suggestions) if suggestions else 'aucune'}",
+                            lang,
                         ),
                         status="warning",
                     )
                     continue
-
-                intent = interpretation.decision.intent
-                command = INTENT_TO_COMMAND.get(intent, intent if "." in intent else "command.unknown")
 
                 if text.strip().lower().startswith("confirm "):
                     token = text.strip().split(" ", 1)[1]
                     command = "confirm"
                     merged_entities["confirm_token"] = token
 
+                if not command:
+                    await self.presenter.emit_system(
+                        websocket,
+                        self._msg(
+                            "Command not recognized.",
+                            "Commande non reconnue.",
+                            lang,
+                        ),
+                        status="warning",
+                    )
+                    continue
+
+                if command == "legacy.create_and_deploy":
+                    entities_for_command = self._entities_for_command(
+                        "apps.create",
+                        self._normalize_entities(merged_entities),
+                        self._normalize_entities(dict(interpretation.entities.values)),
+                    )
+                    context = CommandContext(
+                        session_id=session_id,
+                        user_id=user_id,
+                        app_scope=entities_for_command.get("app_name"),
+                        region_scope=entities_for_command.get("region"),
+                        trace_id=str(uuid.uuid4()),
+                    )
+                    create_result = self.engine.execute(
+                        command="apps.create",
+                        entities=entities_for_command,
+                        raw_text=text,
+                        context=context,
+                    )
+                    await self.presenter.emit(websocket, create_result)
+                    if create_result.status not in {"success"}:
+                        continue
+
+                    deploy_entities = dict(entities_for_command)
+                    deploy_result = self.engine.execute(
+                        command="deployments.create",
+                        entities=deploy_entities,
+                        raw_text=text,
+                        context=context,
+                    )
+                    await self.presenter.emit(websocket, deploy_result)
+                    continue
+
+                current_entities = dict(interpretation.entities.values)
+                entities_for_command = self._entities_for_command(
+                    command,
+                    self._normalize_entities(merged_entities),
+                    self._normalize_entities(current_entities),
+                )
+
                 context = CommandContext(
                     session_id=session_id,
                     user_id=user_id,
-                    app_scope=merged_entities.get("app_name"),
-                    region_scope=merged_entities.get("region"),
+                    app_scope=entities_for_command.get("app_name"),
+                    region_scope=entities_for_command.get("region"),
                     trace_id=str(uuid.uuid4()),
                 )
 
-                result = self.engine.execute(command=command, entities=merged_entities, raw_text=text, context=context)
+                result = self.engine.execute(command=command, entities=entities_for_command, raw_text=text, context=context)
+                if result.event_type == "command.validation_error":
+                    missing = result.structured_payload.get("missing_entities", [])
+                    result = type(result)(
+                        event_type=result.event_type,
+                        status=result.status,
+                        human_message=self._msg(
+                            f"Missing fields for {command}: {', '.join(missing)}",
+                            f"Champs manquants pour {command}: {', '.join(missing)}",
+                            lang,
+                        ),
+                        structured_payload=result.structured_payload,
+                        next_actions=result.next_actions,
+                        risk_level=result.risk_level,
+                        action_id=result.action_id,
+                    )
                 await self.presenter.emit(websocket, result)
 
         except WebSocketDisconnect:
@@ -123,6 +219,85 @@ class WebSocketV2Handler:
         except Exception as exc:
             logger.error("ws.v2 error", error=str(exc), session_id=session_id)
             await self.presenter.emit_system(websocket, f"Internal ws.v2 error: {exc}", status="error")
+
+    def _entities_for_command(self, command: str, merged: Dict[str, object], current: Dict[str, object]) -> Dict[str, object]:
+        if command == "confirm":
+            return merged
+        if self.engine.is_destructive(command):
+            safe = dict(merged)
+            if "app_name" not in current or "region" not in current:
+                safe.pop("app_name", None)
+                safe.pop("region", None)
+            safe.update(current)
+            return safe
+        safe = dict(merged)
+        safe.update(current)
+        return safe
+
+    @staticmethod
+    def _normalize_entities(raw: Dict[str, object]) -> Dict[str, object]:
+        """Normalize legacy entity keys/values to ws.v2 command schema."""
+        entities = dict(raw)
+
+        if "container_name" in entities and "container_type" not in entities:
+            entities["container_type"] = entities.get("container_name")
+        if "container_amount" in entities and "amount" not in entities:
+            entities["amount"] = entities.get("container_amount")
+
+        if "variable_name" in entities and "env_name" not in entities:
+            entities["env_name"] = entities.get("variable_name")
+        if "variable_value" in entities and "env_value" not in entities:
+            entities["env_value"] = entities.get("variable_value")
+
+        scope = entities.get("scope")
+        if isinstance(scope, str):
+            entities["scope"] = [s.strip() for s in scope.split(",") if s.strip()]
+
+        return entities
+
+    @staticmethod
+    def _resolve_command(intent: str, text: str) -> Optional[str]:
+        command = INTENT_TO_COMMAND.get(intent)
+        if command:
+            return command
+        if "." in intent:
+            return intent
+        if text.strip().lower().startswith("confirm "):
+            return "confirm"
+        return None
+
+    @staticmethod
+    def _rule_based_fallback(text: str) -> tuple[Optional[str], Dict[str, str]]:
+        s = text.strip()
+        patterns = [
+            (r"(?:show|list|get)\s+env(?:ironment)?\s*(?:vars|variables)?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "env_vars.list", ("app_name", "region")),
+            (r"(?:unset|delete|remove)\s+env\s+([A-Za-z_][A-Za-z0-9_]*)\s+(?:for|on)\s+([a-z0-9-]+)\s+(?:in|on)\s+([a-z0-9-]+)", "env_vars.unset", ("env_name", "app_name", "region")),
+            (r"(?:restart|redeploy)\s+(?:app\s+)?([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.restart", ("app_name", "region")),
+            (r"(?:list|show|get)\s+addons\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "addons.list", ("app_name", "region")),
+            (r"(?:list|show|get)\s+containers\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "containers.list", ("app_name", "region")),
+        ]
+        for pattern, command, keys in patterns:
+            m = re.search(pattern, s, flags=re.IGNORECASE)
+            if m:
+                return command, {k: m.group(i + 1).lower() for i, k in enumerate(keys)}
+        return None, {}
+
+    @staticmethod
+    def _detect_lang(text: str) -> str:
+        low = text.lower()
+        fr_hits = ["bonjour", "merci", "supprime", "redemarre", "pour", "avec", "sur", "app", "variables"]
+        en_hits = ["please", "delete", "restart", "show", "list", "with", "for", "on"]
+        fr_score = sum(1 for token in fr_hits if token in low)
+        en_score = sum(1 for token in en_hits if token in low)
+        if fr_score >= en_score:
+            return "fr"
+        return "en"
+
+    @staticmethod
+    def _msg(en: str, fr: str, lang: str) -> str:
+        if lang == "fr":
+            return f"{fr} / {en}"
+        return f"{en} / {fr}"
 
     @staticmethod
     def _anonymous_user_id(websocket: WebSocket) -> str:
