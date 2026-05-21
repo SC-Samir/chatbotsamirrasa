@@ -201,25 +201,19 @@
     const statusOrder = ["queued", "building", "pushing", "starting", "success"];
     const statusProgress = { queued: 10, building: 45, pushing: 70, starting: 90, success: 100 };
 
-    const demoPromptTemplates = [
-      "list apps on {{region}}",
-      "show app {{app}} on {{region}}",
-      "show logs for {{app}} on {{region}}",
-      "list deployments for {{app}} on {{region}}",
-      "delete app {{app}} on {{region}}",
-      "create and deploy {{app}} to {{region}} with {{repo}} on branch {{branch}}"
+    const demoPromptActions = [
+      { label: "List apps", build: (v) => `list apps on ${v.region}` },
+      { label: "Show app", build: (v) => `show app ${v.app} on ${v.region}` },
+      { label: "Show logs", build: (v) => `show logs for ${v.app} on ${v.region}` },
+      { label: "List deployments", build: (v) => `list deployments for ${v.app} on ${v.region}` },
+      { label: "Delete app", build: (v) => `delete app ${v.app} on ${v.region}` },
+      { label: "Create & deploy", build: (v) => `create and deploy ${v.app} to ${v.region} with ${v.repo} on branch ${v.branch}` },
     ];
     const debugMode = new URLSearchParams(window.location.search).get("debug") === "1";
 
     function safeDemoValue(raw, fallback, maxLen) {
       const value = String(raw || "").trim() || fallback;
       return value.slice(0, maxLen);
-    }
-
-    function compactLabel(text, maxLen) {
-      const clean = String(text || "").replace(/\s+/g, " ").trim();
-      if (clean.length <= maxLen) return clean;
-      return `${clean.slice(0, maxLen - 1)}…`;
     }
 
     function getDemoVars() {
@@ -231,26 +225,18 @@
       };
     }
 
-    function renderPrompt(template, vars) {
-      return template
-        .replaceAll("{{region}}", vars.region)
-        .replaceAll("{{app}}", vars.app)
-        .replaceAll("{{repo}}", vars.repo)
-        .replaceAll("{{branch}}", vars.branch);
-    }
-
     function bootPromptChips() {
       promptChipsEl.innerHTML = "";
       const vars = getDemoVars();
-      for (const template of demoPromptTemplates) {
-        const prompt = renderPrompt(template, vars);
+      for (const action of demoPromptActions) {
+        const prompt = action.build(vars);
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "max-w-full rounded-2xl border border-cmd-line bg-cmd-bg2/65 px-3 py-1 text-left text-xs text-cmd-text transition hover:border-cmd-amber/60 hover:text-cmd-amber overflow-hidden text-ellipsis whitespace-nowrap";
-        btn.textContent = compactLabel(prompt, 90);
+        btn.className = "rounded-full border border-cmd-line bg-cmd-bg2/65 px-3 py-1 text-xs text-cmd-text transition hover:border-cmd-amber/60 hover:text-cmd-amber";
+        btn.textContent = action.label;
         btn.title = prompt;
         btn.addEventListener("click", () => {
-          inputEl.value = prompt;
+          inputEl.value = action.build(getDemoVars());
           inputEl.focus();
         });
         promptChipsEl.appendChild(btn);
