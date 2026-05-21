@@ -6,4 +6,5 @@ gunicorn
 jinja2
 celery
 redis
+psycopg[binary]
 httpx
