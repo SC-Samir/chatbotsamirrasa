@@ -155,11 +155,26 @@ class WebSocketV2Handler:
                     if fallback_entities:
                         # When regex fallback matched, trust those extracted entities over noisy NLU entities.
                         current_for_legacy = self._normalize_entities(fallback_entities)
-                    entities_for_command = self._entities_for_command(
+                    raw_entities_for_command = self._entities_for_command(
                         "apps.create",
                         merged_for_legacy,
                         current_for_legacy,
                     )
+                    # Keep only fields relevant for create+deploy flow.
+                    app_name = str(raw_entities_for_command.get("app_name") or "").strip()
+                    region = str(raw_entities_for_command.get("region") or "").strip()
+                    github_repo = str(raw_entities_for_command.get("github_repo") or "").strip()
+                    source_url = str(raw_entities_for_command.get("source_url") or "").strip()
+                    git_ref = str(raw_entities_for_command.get("git_ref") or "").strip()
+                    if not git_ref or git_ref in {":", "-", ".", "/"}:
+                        git_ref = "main"
+                    entities_for_command = {
+                        "app_name": app_name,
+                        "region": region,
+                        "github_repo": github_repo,
+                        "source_url": source_url,
+                        "git_ref": git_ref,
+                    }
                     context = CommandContext(
                         session_id=session_id,
                         user_id=user_id,
@@ -177,7 +192,13 @@ class WebSocketV2Handler:
                     if create_result.status not in {"success"}:
                         continue
 
-                    deploy_entities = dict(entities_for_command)
+                    deploy_entities = {
+                        "app_name": entities_for_command.get("app_name"),
+                        "region": entities_for_command.get("region"),
+                        "github_repo": entities_for_command.get("github_repo"),
+                        "source_url": entities_for_command.get("source_url"),
+                        "git_ref": entities_for_command.get("git_ref"),
+                    }
                     deploy_result = self.engine.execute(
                         command="deployments.create",
                         entities=deploy_entities,
