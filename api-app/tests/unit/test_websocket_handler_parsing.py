@@ -20,3 +20,11 @@ def test_extract_explicit_git_ref_handles_on_branch_phrase():
         )
         == "master"
     )
+
+
+def test_rule_based_fallback_matches_show_logs_command():
+    command, entities = WebSocketV2Handler._rule_based_fallback("show logs of samirtest4 on osc-fr1")
+
+    assert command == "legacy.show_logs"
+    assert entities["app_name"] == "samirtest4"
+    assert entities["region"] == "osc-fr1"

@@ -210,6 +210,66 @@ class WebSocketV2Handler:
                     )
                     await self.presenter.emit(websocket, deploy_result)
                     continue
+                if command == "legacy.show_logs":
+                    normalized = self._normalize_entities(merged_entities)
+                    current = self._normalize_entities(dict(interpretation.entities.values))
+                    if fallback_entities:
+                        current = self._normalize_entities(fallback_entities)
+                    entities_for_command = self._entities_for_command("deployments.list", normalized, current)
+                    context = CommandContext(
+                        session_id=session_id,
+                        user_id=user_id,
+                        app_scope=entities_for_command.get("app_name"),
+                        region_scope=entities_for_command.get("region"),
+                        trace_id=str(uuid.uuid4()),
+                    )
+                    list_result = self.engine.execute(
+                        command="deployments.list",
+                        entities=entities_for_command,
+                        raw_text=text,
+                        context=context,
+                    )
+                    if list_result.status != "success":
+                        await self.presenter.emit(websocket, list_result)
+                        continue
+                    deployments = list_result.structured_payload.get("deployments") or []
+                    if not deployments:
+                        await self.presenter.emit_system(
+                            websocket,
+                            self._msg(
+                                "No deployments found for this app.",
+                                "Aucun deploiement trouve pour cette app.",
+                                lang,
+                            ),
+                            status="warning",
+                        )
+                        continue
+                    latest_deployment = deployments[0] if isinstance(deployments[0], dict) else {}
+                    deployment_id = str(latest_deployment.get("id") or "").strip()
+                    if not deployment_id:
+                        await self.presenter.emit_system(
+                            websocket,
+                            self._msg(
+                                "Unable to determine latest deployment id.",
+                                "Impossible de determiner l'identifiant du dernier deploiement.",
+                                lang,
+                            ),
+                            status="warning",
+                        )
+                        continue
+                    output_entities = {
+                        "app_name": entities_for_command.get("app_name"),
+                        "region": entities_for_command.get("region"),
+                        "deployment_id": deployment_id,
+                    }
+                    output_result = self.engine.execute(
+                        command="deployments.output",
+                        entities=output_entities,
+                        raw_text=text,
+                        context=context,
+                    )
+                    await self.presenter.emit(websocket, output_result)
+                    continue
 
                 current_entities = dict(interpretation.entities.values)
                 if fallback_entities:
@@ -313,6 +373,7 @@ class WebSocketV2Handler:
             (r"(?:restart|redeploy)\s+(?:app\s+)?([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.restart", ("app_name", "region")),
             (r"(?:list|show|get)\s+addons\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "addons.list", ("app_name", "region")),
             (r"(?:list|show|get)\s+containers\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "containers.list", ("app_name", "region")),
+            (r"(?:show|get|list)\s+logs\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "legacy.show_logs", ("app_name", "region")),
         ]
         for pattern, command, keys in patterns:
             m = re.search(pattern, s, flags=re.IGNORECASE)
