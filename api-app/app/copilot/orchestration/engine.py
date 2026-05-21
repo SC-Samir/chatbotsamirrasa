@@ -249,6 +249,14 @@ class CommandEngine:
     def _apps_delete(self, req: CommandRequest) -> CommandResult:
         app_name, region = self._resolve_app_region(req)
         payload = self.gateway.apps_delete(app_name, region)
+        if payload.get("accepted") is False:
+            return CommandResult(
+                "apps.delete",
+                "error",
+                "Application deletion failed or was rejected by Scalingo API",
+                payload,
+                risk_level="high",
+            )
         return self._with_mutation_preview(req, CommandResult("apps.delete", "success", "Application deletion requested", payload, risk_level="high"))
 
     def _apps_rename(self, req: CommandRequest) -> CommandResult:

@@ -52,7 +52,7 @@ class ScalingoOpsGateway:
         return result.value if result.success and result.value else {}
 
     def apps_delete(self, app_name: str, region: str) -> Dict[str, Any]:
-        result = self.client.request("DELETE", self._region(region), f"/v1/apps/{app_name}")
+        result = self.client.request("DELETE", self._region(region), f"/v1/apps/{app_name}", params={"current_name": app_name})
         return result.value if result.success and result.value else {"accepted": result.success}
 
     def apps_restart(self, app_name: str, region: str, scope: Optional[list[str]] = None) -> Dict[str, Any]:

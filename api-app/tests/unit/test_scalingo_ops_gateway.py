@@ -54,3 +54,13 @@ def test_deployments_create_prefers_explicit_source_url_over_github_repo():
         "git_ref": "master",
         "source_url": "https://example.com/archive.tar.gz",
     }
+
+
+def test_apps_delete_includes_current_name_query_param():
+    gateway = ScalingoOpsGateway(client=DummyClient())
+
+    gateway.apps_delete(app_name="demo", region="osc-fr1")
+
+    assert gateway.client.calls[0]["method"] == "DELETE"
+    assert gateway.client.calls[0]["path"] == "/v1/apps/demo"
+    assert gateway.client.calls[0]["params"] == {"current_name": "demo"}
