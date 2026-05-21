@@ -136,6 +136,24 @@
 
       <section class="border-b border-cmd-line/70 px-4 py-3 sm:px-6">
         <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-cmd-mute">Demo Prompts</p>
+        <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <label class="text-[10px] uppercase tracking-[0.12em] text-cmd-mute">
+            Region
+            <input id="demoRegion" type="text" value="osc-fr1" class="mt-1 w-full rounded-lg border border-cmd-line bg-cmd-bg2/70 px-2 py-1 text-xs text-cmd-text outline-none focus:border-cmd-amber">
+          </label>
+          <label class="text-[10px] uppercase tracking-[0.12em] text-cmd-mute">
+            App
+            <input id="demoApp" type="text" value="demo" class="mt-1 w-full rounded-lg border border-cmd-line bg-cmd-bg2/70 px-2 py-1 text-xs text-cmd-text outline-none focus:border-cmd-amber">
+          </label>
+          <label class="text-[10px] uppercase tracking-[0.12em] text-cmd-mute">
+            Github Repo
+            <input id="demoRepo" type="text" value="https://github.com/Scalingo/sample-go-gin" class="mt-1 w-full rounded-lg border border-cmd-line bg-cmd-bg2/70 px-2 py-1 text-xs text-cmd-text outline-none focus:border-cmd-amber">
+          </label>
+          <label class="text-[10px] uppercase tracking-[0.12em] text-cmd-mute">
+            Branch
+            <input id="demoBranch" type="text" value="master" class="mt-1 w-full rounded-lg border border-cmd-line bg-cmd-bg2/70 px-2 py-1 text-xs text-cmd-text outline-none focus:border-cmd-amber">
+          </label>
+        </div>
         <div id="promptChips" class="mt-2 flex flex-wrap gap-2"></div>
       </section>
 
@@ -165,6 +183,10 @@
     const inputEl = document.getElementById("input");
     const sendButtonEl = document.getElementById("sendButton");
     const promptChipsEl = document.getElementById("promptChips");
+    const demoRegionEl = document.getElementById("demoRegion");
+    const demoAppEl = document.getElementById("demoApp");
+    const demoRepoEl = document.getElementById("demoRepo");
+    const demoBranchEl = document.getElementById("demoBranch");
     const connectionBadgeEl = document.getElementById("connectionBadge");
     const connectionDotEl = document.getElementById("connectionDot");
 
@@ -179,19 +201,38 @@
     const statusOrder = ["queued", "building", "pushing", "starting", "success"];
     const statusProgress = { queued: 10, building: 45, pushing: 70, starting: 90, success: 100 };
 
-    const demoPrompts = [
-      "list apps on osc-fr1",
-      "show app demo on osc-fr1",
-      "show logs for demo on osc-fr1",
-      "list deployments for demo on osc-fr1",
-      "delete app demo on osc-fr1",
-      "create and deploy samirtest4 to osc-fr1 with https://github.com/Scalingo/sample-go-gin on branch master"
+    const demoPromptTemplates = [
+      "list apps on {{region}}",
+      "show app {{app}} on {{region}}",
+      "show logs for {{app}} on {{region}}",
+      "list deployments for {{app}} on {{region}}",
+      "delete app {{app}} on {{region}}",
+      "create and deploy samirtest4 to {{region}} with {{repo}} on branch {{branch}}"
     ];
     const debugMode = new URLSearchParams(window.location.search).get("debug") === "1";
 
+    function getDemoVars() {
+      return {
+        region: (demoRegionEl?.value || "osc-fr1").trim() || "osc-fr1",
+        app: (demoAppEl?.value || "demo").trim() || "demo",
+        repo: (demoRepoEl?.value || "https://github.com/Scalingo/sample-go-gin").trim() || "https://github.com/Scalingo/sample-go-gin",
+        branch: (demoBranchEl?.value || "master").trim() || "master"
+      };
+    }
+
+    function renderPrompt(template, vars) {
+      return template
+        .replaceAll("{{region}}", vars.region)
+        .replaceAll("{{app}}", vars.app)
+        .replaceAll("{{repo}}", vars.repo)
+        .replaceAll("{{branch}}", vars.branch);
+    }
+
     function bootPromptChips() {
       promptChipsEl.innerHTML = "";
-      for (const prompt of demoPrompts) {
+      const vars = getDemoVars();
+      for (const template of demoPromptTemplates) {
+        const prompt = renderPrompt(template, vars);
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "rounded-full border border-cmd-line bg-cmd-bg2/65 px-3 py-1 text-xs text-cmd-text transition hover:border-cmd-amber/60 hover:text-cmd-amber";
@@ -733,6 +774,10 @@
 
     setConnectionState("connecting");
     bootPromptChips();
+    [demoRegionEl, demoAppEl, demoRepoEl, demoBranchEl].forEach((el) => {
+      if (!el) return;
+      el.addEventListener("input", bootPromptChips);
+    });
   </script>
 </body>
 </html>
