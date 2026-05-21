@@ -143,7 +143,7 @@
           </label>
           <label class="text-[10px] uppercase tracking-[0.12em] text-cmd-mute">
             App
-            <input id="demoApp" type="text" value="demo" class="mt-1 w-full rounded-lg border border-cmd-line bg-cmd-bg2/70 px-2 py-1 text-xs text-cmd-text outline-none focus:border-cmd-amber">
+            <input id="demoApp" type="text" value="samirtest4" class="mt-1 w-full rounded-lg border border-cmd-line bg-cmd-bg2/70 px-2 py-1 text-xs text-cmd-text outline-none focus:border-cmd-amber">
           </label>
           <label class="text-[10px] uppercase tracking-[0.12em] text-cmd-mute">
             Github Repo
@@ -154,7 +154,7 @@
             <input id="demoBranch" type="text" value="master" class="mt-1 w-full rounded-lg border border-cmd-line bg-cmd-bg2/70 px-2 py-1 text-xs text-cmd-text outline-none focus:border-cmd-amber">
           </label>
         </div>
-        <div id="promptChips" class="mt-2 flex flex-wrap gap-2"></div>
+        <div id="promptChips" class="mt-2 flex max-h-44 flex-wrap gap-2 overflow-y-auto pr-1"></div>
       </section>
 
       <ul id="messages" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 sm:px-6"></ul>
@@ -207,16 +207,27 @@
       "show logs for {{app}} on {{region}}",
       "list deployments for {{app}} on {{region}}",
       "delete app {{app}} on {{region}}",
-      "create and deploy samirtest4 to {{region}} with {{repo}} on branch {{branch}}"
+      "create and deploy {{app}} to {{region}} with {{repo}} on branch {{branch}}"
     ];
     const debugMode = new URLSearchParams(window.location.search).get("debug") === "1";
 
+    function safeDemoValue(raw, fallback, maxLen) {
+      const value = String(raw || "").trim() || fallback;
+      return value.slice(0, maxLen);
+    }
+
+    function compactLabel(text, maxLen) {
+      const clean = String(text || "").replace(/\s+/g, " ").trim();
+      if (clean.length <= maxLen) return clean;
+      return `${clean.slice(0, maxLen - 1)}…`;
+    }
+
     function getDemoVars() {
       return {
-        region: (demoRegionEl?.value || "osc-fr1").trim() || "osc-fr1",
-        app: (demoAppEl?.value || "demo").trim() || "demo",
-        repo: (demoRepoEl?.value || "https://github.com/Scalingo/sample-go-gin").trim() || "https://github.com/Scalingo/sample-go-gin",
-        branch: (demoBranchEl?.value || "master").trim() || "master"
+        region: safeDemoValue(demoRegionEl?.value, "osc-fr1", 24),
+        app: safeDemoValue(demoAppEl?.value, "samirtest4", 40),
+        repo: safeDemoValue(demoRepoEl?.value, "https://github.com/Scalingo/sample-go-gin", 180),
+        branch: safeDemoValue(demoBranchEl?.value, "master", 60)
       };
     }
 
@@ -235,8 +246,9 @@
         const prompt = renderPrompt(template, vars);
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "rounded-full border border-cmd-line bg-cmd-bg2/65 px-3 py-1 text-xs text-cmd-text transition hover:border-cmd-amber/60 hover:text-cmd-amber";
-        btn.textContent = prompt;
+        btn.className = "max-w-full rounded-2xl border border-cmd-line bg-cmd-bg2/65 px-3 py-1 text-left text-xs text-cmd-text transition hover:border-cmd-amber/60 hover:text-cmd-amber overflow-hidden text-ellipsis whitespace-nowrap";
+        btn.textContent = compactLabel(prompt, 90);
+        btn.title = prompt;
         btn.addEventListener("click", () => {
           inputEl.value = prompt;
           inputEl.focus();
