@@ -277,6 +277,10 @@
         .replaceAll("'", "&#39;");
     }
 
+    function escapeAttr(value) {
+      return escapeHtml(String(value || ""));
+    }
+
     function parseWsEnvelope(text) {
       try {
         const parsed = JSON.parse(text);
@@ -460,11 +464,13 @@
       if (envelope?.status !== "requires_confirmation") return "";
       const token = envelope?.structured_payload?.confirm_token;
       if (!token) return "";
+      const command = `confirm ${token}`;
       return `
         <div class="rounded-xl border border-cmd-red/55 bg-cmd-red/10 p-3">
           <p class="text-xs font-bold uppercase tracking-[0.12em] text-cmd-red">Confirmation Required</p>
           <p class="mt-1 text-sm text-cmd-text">Action destructive detectee. Execute la commande suivante pour confirmer :</p>
-          <code class="mt-2 inline-block rounded border border-cmd-red/50 bg-[#281512] px-2 py-1 font-mono text-xs text-cmd-red">confirm ${escapeHtml(token)}</code>
+          <code class="mt-2 inline-block rounded border border-cmd-red/50 bg-[#281512] px-2 py-1 font-mono text-xs text-cmd-red">${escapeHtml(command)}</code>
+          <button type="button" data-action-cmd="${escapeAttr(command)}" class="ml-2 rounded-lg border border-cmd-red/45 bg-cmd-red/15 px-2 py-1 text-xs font-semibold text-cmd-red hover:bg-cmd-red/25">Confirm now</button>
         </div>
       `;
     }
@@ -489,9 +495,21 @@
       return `
         <div>
           <p class="mb-2 text-[10px] uppercase tracking-[0.12em] text-cmd-mute">Next Actions</p>
-          <div class="flex flex-wrap gap-2">${actions.map((a) => `<code class="rounded-full border border-cmd-green/35 bg-cmd-green/12 px-2 py-1 font-mono text-xs text-cmd-green">${escapeHtml(a)}</code>`).join("")}</div>
+          <div class="flex flex-wrap gap-2">${actions.map((a) => `
+            <button type="button" data-action-cmd="${escapeAttr(a)}" class="rounded-full border border-cmd-green/35 bg-cmd-green/12 px-2 py-1 font-mono text-xs text-cmd-green hover:bg-cmd-green/20">${escapeHtml(a)}</button>
+          `).join("")}</div>
         </div>
       `;
+    }
+
+    function sendQuickCommand(command) {
+      const text = String(command || "").trim();
+      if (!text || isAwaitingResponse) return;
+      appendUserMessage(text);
+      lastUserCommand = text;
+      createPendingCommandCard(lastUserCommand);
+      setComposerLocked(true);
+      ws.send(text);
     }
 
     function createDebugDetails(envelope, rawText) {
@@ -595,6 +613,13 @@
           </div>
         </div>
       `;
+
+      li.querySelectorAll("[data-action-cmd]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const cmd = btn.getAttribute("data-action-cmd") || "";
+          sendQuickCommand(cmd);
+        });
+      });
 
       messages.appendChild(li);
       messages.scrollTop = messages.scrollHeight;
@@ -727,11 +752,9 @@
       if (isAwaitingResponse) return;
       if (!inputEl.value) return;
 
-      appendUserMessage(inputEl.value);
-      lastUserCommand = inputEl.value.trim();
-      createPendingCommandCard(lastUserCommand);
-      setComposerLocked(true);
-      ws.send(inputEl.value);
+      const cmd = inputEl.value.trim();
+      if (!cmd) return;
+      sendQuickCommand(cmd);
       inputEl.value = "";
     }
 
