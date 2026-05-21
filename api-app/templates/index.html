@@ -184,8 +184,10 @@
       "show app demo on osc-fr1",
       "show logs for demo on osc-fr1",
       "list deployments for demo on osc-fr1",
-      "delete app demo on osc-fr1"
+      "delete app demo on osc-fr1",
+      "create and deploy samirtest4 to osc-fr1 with https://github.com/Scalingo/sample-go-gin on branch master"
     ];
+    const debugMode = new URLSearchParams(window.location.search).get("debug") === "1";
 
     function bootPromptChips() {
       promptChipsEl.innerHTML = "";
@@ -266,6 +268,25 @@
 
     function formatEventLabel(eventType) {
       return (eventType || "system.message").replaceAll(".", " · ");
+    }
+
+    function cleanHumanMessage(envelope, rawText) {
+      const source = String(envelope?.human_message || rawText || "").trim();
+      if (!source) return "";
+
+      // Keep the first locale segment for concise demo output when backend sends bilingual text.
+      let cleaned = source.includes(" / ") ? source.split(" / ")[0].trim() : source;
+
+      // Hide noisy preview payload details in the main sentence.
+      cleaned = cleaned.replace(/^Action preview:[\s\S]*?\.\s*/i, "");
+
+      if (!cleaned) {
+        if (envelope?.status === "success") return "Operation terminee avec succes.";
+        if (envelope?.status === "warning") return "Operation terminee avec attention requise.";
+        if (envelope?.status === "error") return "Une erreur est survenue pendant l'operation.";
+      }
+
+      return cleaned || source;
     }
 
     function normalizeProgress(data) {
@@ -435,6 +456,7 @@
     }
 
     function createDebugDetails(envelope, rawText) {
+      if (!debugMode) return "";
       const payloadText = envelope ? JSON.stringify(envelope.structured_payload || {}, null, 2) : rawText;
       return `
         <details class="rounded-xl border border-cmd-line bg-cmd-bg2/45 px-3 py-2">
@@ -487,7 +509,7 @@
 
     function appendBotCard(rawText) {
       const envelope = parseWsEnvelope(rawText);
-      const textForDisplay = envelope?.human_message || rawText;
+      const textForDisplay = cleanHumanMessage(envelope, rawText);
       const eventType = envelope?.event_type || "system.message";
       const status = envelope?.status || "success";
       const riskLevel = envelope?.risk_level || "none";
@@ -520,7 +542,7 @@
                 <p class="text-sm font-bold text-cmd-text">Ops Assistant</p>
                 ${commandSummary}
               </div>
-              <pre class="rounded-xl border border-cmd-line bg-cmd-bg2/55 px-3 py-2 text-sm text-cmd-text whitespace-pre-wrap">${escapeHtml(textForDisplay)}</pre>
+              <p class="rounded-xl border border-cmd-line bg-cmd-bg2/55 px-3 py-2 text-sm text-cmd-text whitespace-pre-wrap">${escapeHtml(textForDisplay)}</p>
               ${renderConfirmationCard(envelope)}
               ${showValidation ? renderValidationCard(envelope) : ""}
               ${showAppList ? renderAppList(payload) : ""}
