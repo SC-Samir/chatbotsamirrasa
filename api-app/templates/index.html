@@ -1,500 +1,716 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>ScalingoOps Agent</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ["Sora", "Manrope", "Avenir Next", "Segoe UI", "sans-serif"]
-                    },
-                    keyframes: {
-                        floatSlow: {
-                            "0%,100%": { transform: "translate3d(0,0,0)" },
-                            "50%": { transform: "translate3d(0,-8px,0)" }
-                        },
-                        fadeSlide: {
-                            "0%": { opacity: "0", transform: "translate3d(0,10px,0)" },
-                            "100%": { opacity: "1", transform: "translate3d(0,0,0)" }
-                        },
-                        softPulse: {
-                            "0%,100%": { opacity: "1" },
-                            "50%": { opacity: ".7" }
-                        },
-                        scan: {
-                            "0%": { backgroundPosition: "180% 0" },
-                            "100%": { backgroundPosition: "-180% 0" }
-                        }
-                    },
-                    animation: {
-                        floatSlow: "floatSlow 8s ease-in-out infinite",
-                        fadeSlide: "fadeSlide 260ms cubic-bezier(.22,.61,.36,1)",
-                        softPulse: "softPulse 1.4s ease-in-out infinite",
-                        scan: "scan 2s linear infinite"
-                    },
-                    boxShadow: {
-                        neon: "0 0 0 1px rgba(125,211,252,.25),0 12px 32px rgba(14,116,144,.22)",
-                        card: "0 12px 30px rgba(2,6,23,.28)"
-                    }
-                }
+  <meta charset="UTF-8">
+  <title>ScalingoOps Command Center</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["Space Grotesk", "Avenir Next", "Segoe UI", "sans-serif"],
+            mono: ["IBM Plex Mono", "ui-monospace", "monospace"]
+          },
+          colors: {
+            cmd: {
+              bg0: "#0b0a08",
+              bg1: "#15120d",
+              bg2: "#231d14",
+              line: "#3a2f1f",
+              amber: "#f2b96c",
+              green: "#8fdfa9",
+              red: "#f58a7b",
+              text: "#f4ead7",
+              mute: "#c8b89d"
             }
+          },
+          keyframes: {
+            riseIn: {
+              "0%": { opacity: "0", transform: "translate3d(0,10px,0)" },
+              "100%": { opacity: "1", transform: "translate3d(0,0,0)" }
+            },
+            pulseSignal: {
+              "0%,100%": { opacity: "1" },
+              "50%": { opacity: ".45" }
+            },
+            radarSweep: {
+              "0%": { transform: "rotate(0deg)" },
+              "100%": { transform: "rotate(360deg)" }
+            }
+          },
+          animation: {
+            riseIn: "riseIn 260ms cubic-bezier(.21,.84,.32,1)",
+            pulseSignal: "pulseSignal 1.5s ease-in-out infinite",
+            radarSweep: "radarSweep 9s linear infinite"
+          },
+          boxShadow: {
+            panel: "0 20px 45px rgba(0,0,0,.42)",
+            glow: "0 0 0 1px rgba(242,185,108,.35), 0 12px 30px rgba(242,185,108,.15)"
+          }
         }
-    </script>
-    <style>
-        .bg-mesh {
-            background:
-                radial-gradient(1200px 520px at 8% -10%, rgba(16, 185, 129, 0.18), transparent 55%),
-                radial-gradient(900px 420px at 92% 0%, rgba(56, 189, 248, 0.2), transparent 58%),
-                linear-gradient(135deg, #020617 0%, #0b1733 50%, #0f2d59 100%);
-        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --scanline: repeating-linear-gradient(to bottom, rgba(255,255,255,.03), rgba(255,255,255,.03) 1px, transparent 1px, transparent 4px);
+      --grid: linear-gradient(rgba(242,185,108,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(242,185,108,.07) 1px, transparent 1px);
+    }
 
-        @media (prefers-reduced-motion: reduce) {
-            .motion-safe\:animate-fadeSlide,
-            .motion-safe\:animate-floatSlow,
-            .motion-safe\:animate-softPulse,
-            .motion-safe\:animate-scan,
-            .animate-spin,
-            .animate-bounce,
-            .animate-pulse {
-                animation: none !important;
-            }
-        }
-    </style>
+    .cmd-atmosphere {
+      background:
+        radial-gradient(1200px 560px at 5% -8%, rgba(242,185,108,.15), transparent 55%),
+        radial-gradient(900px 480px at 96% 0%, rgba(143,223,169,.15), transparent 60%),
+        linear-gradient(135deg, #0b0a08 0%, #141009 46%, #1d1710 100%);
+    }
+
+    .cmd-grid {
+      background-image: var(--grid);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+      opacity: .4;
+    }
+
+    .cmd-scanline {
+      background-image: var(--scanline);
+      mix-blend-mode: soft-light;
+      opacity: .28;
+    }
+
+    .radar {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .radar::before {
+      content: "";
+      position: absolute;
+      inset: -45%;
+      background: conic-gradient(from 0deg, transparent 0deg, rgba(242,185,108,.25) 55deg, transparent 95deg);
+      animation: radarSweep 9s linear infinite;
+      pointer-events: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .motion-safe\:animate-riseIn,
+      .motion-safe\:animate-pulseSignal,
+      .motion-safe\:animate-radarSweep,
+      .animate-spin,
+      .animate-pulse {
+        animation: none !important;
+      }
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-slate-950 font-sans text-slate-100">
-    <div class="bg-mesh fixed inset-0"></div>
-    <div class="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(56,189,248,0.16),transparent_35%),radial-gradient(circle_at_85%_85%,rgba(52,211,153,0.14),transparent_35%)]"></div>
+<body class="min-h-screen bg-cmd-bg0 font-sans text-cmd-text">
+  <div class="cmd-atmosphere fixed inset-0"></div>
+  <div class="cmd-grid pointer-events-none fixed inset-0"></div>
+  <div class="cmd-scanline pointer-events-none fixed inset-0"></div>
 
-    <main class="relative z-10 mx-auto flex h-screen w-full max-w-5xl flex-col p-4 sm:p-6">
-        <section class="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-white/15 bg-slate-900/60 shadow-card backdrop-blur-xl">
-            <header class="border-b border-white/10 px-5 py-4 sm:px-7 sm:py-5">
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-200/80">Scalingo Assistant</p>
-                        <h1 class="mt-1 text-xl font-extrabold tracking-tight text-white sm:text-3xl">Chatbot Ops Console</h1>
-                        <p class="mt-1 text-xs text-slate-300 sm:text-sm">Pilote tes actions infra en conversation, avec suivi de deploiement en direct.</p>
-                    </div>
-                    <span class="hidden rounded-full border border-emerald-200/30 bg-emerald-300/15 px-3 py-1 text-xs font-bold text-emerald-100 sm:inline-flex">Live</span>
-                </div>
-            </header>
+  <main class="relative z-10 mx-auto flex h-screen w-full max-w-6xl flex-col p-3 sm:p-5">
+    <section class="flex h-full min-h-0 flex-col overflow-hidden rounded-[1.6rem] border border-cmd-line bg-cmd-bg1/90 shadow-panel backdrop-blur-sm">
+      <header class="border-b border-cmd-line px-4 py-4 sm:px-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-cmd-amber/85">Scalingo Command Center</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-cmd-text sm:text-3xl">Live Ops Demo Console</h1>
+            <p class="mt-1 max-w-2xl text-sm text-cmd-mute">Pilote les operations infra par conversation avec des retours lisibles, axes actionnables, et suivi live du deploiement.</p>
+          </div>
+          <div class="radar w-full max-w-[240px] rounded-2xl border border-cmd-line bg-cmd-bg2/60 p-3 sm:w-auto">
+            <p class="relative z-10 text-[10px] font-semibold uppercase tracking-[0.16em] text-cmd-mute">Session</p>
+            <div class="relative z-10 mt-2 flex items-center justify-between gap-3">
+              <span id="connectionBadge" class="inline-flex items-center gap-2 rounded-full border border-cmd-green/30 bg-cmd-green/10 px-3 py-1 text-xs font-bold text-cmd-green">
+                <span id="connectionDot" class="h-2 w-2 rounded-full bg-cmd-green motion-safe:animate-pulseSignal"></span>
+                Connected
+              </span>
+              <span class="text-xs font-mono text-cmd-mute">ws.v2</span>
+            </div>
+          </div>
+        </div>
+      </header>
 
-            <ul id="messages" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6"></ul>
+      <section class="border-b border-cmd-line/70 px-4 py-3 sm:px-6">
+        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-cmd-mute">Demo Prompts</p>
+        <div id="promptChips" class="mt-2 flex flex-wrap gap-2"></div>
+      </section>
 
-            <form id="form" action="" onsubmit="sendMessage(event)" class="border-t border-white/10 bg-slate-950/30 p-3 sm:p-4">
-                <div class="grid grid-cols-[1fr_auto] gap-2 sm:gap-3">
-                    <input
-                        id="input"
-                        autocomplete="off"
-                        placeholder="Ex: deploy mon-app, logs mon-app, status"
-                        class="w-full rounded-2xl border border-white/15 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-400/20 sm:text-base"
-                    />
-                    <button id="sendButton" class="rounded-2xl bg-gradient-to-r from-sky-300 to-emerald-300 px-5 py-3 text-sm font-extrabold text-slate-900 shadow-neon transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 sm:text-base">
-                        Envoyer
-                    </button>
-                </div>
-            </form>
-        </section>
-    </main>
+      <ul id="messages" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 sm:px-6"></ul>
 
-    <script>
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
-        const messages = document.getElementById('messages');
-        const inputEl = document.getElementById('input');
-        const sendButtonEl = document.getElementById('sendButton');
-        const deploymentCards = new Map();
-        const deploymentTimers = new Map();
-        let lastUserCommand = "";
-        let isAwaitingResponse = false;
-        let pendingCommandCard = null;
-        let pendingCommandTimer = null;
-        let activeLogsCard = null;
-        let activeBotCard = null;
-        let activeBotIntent = null;
+      <form id="form" action="" onsubmit="sendMessage(event)" class="border-t border-cmd-line bg-cmd-bg1/70 p-3 sm:p-4">
+        <div class="grid grid-cols-[1fr_auto] gap-2 sm:gap-3">
+          <input
+            id="input"
+            autocomplete="off"
+            placeholder="Ex: list apps on osc-fr1"
+            class="w-full rounded-2xl border border-cmd-line bg-cmd-bg2/70 px-4 py-3 text-sm text-cmd-text outline-none transition placeholder:text-cmd-mute focus:border-cmd-amber focus:ring-4 focus:ring-cmd-amber/15 sm:text-base"
+          />
+          <button id="sendButton" class="rounded-2xl bg-gradient-to-r from-cmd-amber to-cmd-green px-5 py-3 text-sm font-extrabold text-cmd-bg0 shadow-glow transition hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45 sm:text-base">
+            Execute
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
 
-        const statusOrder = ["queued", "building", "pushing", "starting", "success"];
-        const statusProgress = { queued: 10, building: 45, pushing: 70, starting: 90, success: 100 };
+  <script>
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
 
-        function setComposerLocked(locked) {
-            isAwaitingResponse = locked;
-            inputEl.disabled = locked;
-            sendButtonEl.disabled = locked;
-            inputEl.placeholder = locked ? "Attends la reponse du bot..." : "Ex: deploy mon-app, logs mon-app, status";
+    const messages = document.getElementById("messages");
+    const inputEl = document.getElementById("input");
+    const sendButtonEl = document.getElementById("sendButton");
+    const promptChipsEl = document.getElementById("promptChips");
+    const connectionBadgeEl = document.getElementById("connectionBadge");
+    const connectionDotEl = document.getElementById("connectionDot");
+
+    const deploymentCards = new Map();
+    const deploymentTimers = new Map();
+
+    let lastUserCommand = "";
+    let isAwaitingResponse = false;
+    let pendingCommandCard = null;
+    let pendingCommandTimer = null;
+
+    const statusOrder = ["queued", "building", "pushing", "starting", "success"];
+    const statusProgress = { queued: 10, building: 45, pushing: 70, starting: 90, success: 100 };
+
+    const demoPrompts = [
+      "list apps on osc-fr1",
+      "show app demo on osc-fr1",
+      "show logs for demo on osc-fr1",
+      "list deployments for demo on osc-fr1",
+      "delete app demo on osc-fr1"
+    ];
+
+    function bootPromptChips() {
+      promptChipsEl.innerHTML = "";
+      for (const prompt of demoPrompts) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "rounded-full border border-cmd-line bg-cmd-bg2/65 px-3 py-1 text-xs text-cmd-text transition hover:border-cmd-amber/60 hover:text-cmd-amber";
+        btn.textContent = prompt;
+        btn.addEventListener("click", () => {
+          inputEl.value = prompt;
+          inputEl.focus();
+        });
+        promptChipsEl.appendChild(btn);
+      }
+    }
+
+    function setConnectionState(state) {
+      if (state === "connected") {
+        connectionBadgeEl.className = "inline-flex items-center gap-2 rounded-full border border-cmd-green/30 bg-cmd-green/10 px-3 py-1 text-xs font-bold text-cmd-green";
+        connectionDotEl.className = "h-2 w-2 rounded-full bg-cmd-green motion-safe:animate-pulseSignal";
+        connectionBadgeEl.lastChild.textContent = "Connected";
+        return;
+      }
+      if (state === "connecting") {
+        connectionBadgeEl.className = "inline-flex items-center gap-2 rounded-full border border-cmd-amber/40 bg-cmd-amber/12 px-3 py-1 text-xs font-bold text-cmd-amber";
+        connectionDotEl.className = "h-2 w-2 rounded-full bg-cmd-amber motion-safe:animate-pulseSignal";
+        connectionBadgeEl.lastChild.textContent = "Connecting";
+        return;
+      }
+      connectionBadgeEl.className = "inline-flex items-center gap-2 rounded-full border border-cmd-red/40 bg-cmd-red/12 px-3 py-1 text-xs font-bold text-cmd-red";
+      connectionDotEl.className = "h-2 w-2 rounded-full bg-cmd-red";
+      connectionBadgeEl.lastChild.textContent = "Offline";
+    }
+
+    function setComposerLocked(locked) {
+      isAwaitingResponse = locked;
+      inputEl.disabled = locked;
+      sendButtonEl.disabled = locked;
+      inputEl.placeholder = locked ? "Execution en cours..." : "Ex: list apps on osc-fr1";
+    }
+
+    function escapeHtml(value) {
+      return (value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function parseWsEnvelope(text) {
+      try {
+        const parsed = JSON.parse(text);
+        if (!parsed || typeof parsed !== "object") return null;
+        if (!parsed.version || !parsed.event_type || !parsed.status) return null;
+        return parsed;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function eventToneClasses(eventType, status) {
+      if ((eventType || "").startsWith("deployments.")) return "border-cmd-amber/55";
+      if ((eventType || "").startsWith("apps.")) return "border-cmd-green/45";
+      if ((eventType || "").includes("validation")) return "border-cmd-amber/55";
+      if (status === "requires_confirmation") return "border-cmd-red/55";
+      if (status === "error") return "border-cmd-red/55";
+      return "border-cmd-line";
+    }
+
+    function statusBadgeClasses(status) {
+      if (status === "success") return "border-cmd-green/40 bg-cmd-green/12 text-cmd-green";
+      if (status === "warning") return "border-cmd-amber/50 bg-cmd-amber/15 text-cmd-amber";
+      if (status === "error") return "border-cmd-red/45 bg-cmd-red/15 text-cmd-red";
+      if (status === "requires_confirmation") return "border-cmd-red/45 bg-cmd-red/15 text-cmd-red";
+      return "border-cmd-line bg-cmd-bg2/40 text-cmd-mute";
+    }
+
+    function formatEventLabel(eventType) {
+      return (eventType || "system.message").replaceAll(".", " · ");
+    }
+
+    function normalizeProgress(data) {
+      if (typeof data.progress === "number") return data.progress;
+      if (statusProgress[data.status] !== undefined) return statusProgress[data.status];
+      return 0;
+    }
+
+    function mapSummaryFields(payload) {
+      if (!payload || typeof payload !== "object") return [];
+      const summary = [];
+      const app = payload.app || {};
+      const deployment = payload.deployment || {};
+
+      if (app.name) summary.push({ k: "App", v: app.name });
+      if (app.region) summary.push({ k: "Region", v: app.region });
+      if (app.status) summary.push({ k: "App Status", v: app.status });
+      if (deployment.id) summary.push({ k: "Deployment", v: deployment.id });
+      if (deployment.status) summary.push({ k: "Deploy Status", v: deployment.status });
+      if (deployment.git_ref) summary.push({ k: "Git Ref", v: deployment.git_ref });
+
+      if (!summary.length) {
+        for (const [k, v] of Object.entries(payload).slice(0, 5)) {
+          if (v === null || v === undefined) continue;
+          if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") summary.push({ k, v: String(v) });
         }
+      }
+      return summary.slice(0, 6);
+    }
 
-        function clearPendingCommandCard(finalText) {
-            if (!pendingCommandCard) return;
-            if (pendingCommandTimer) {
-                clearInterval(pendingCommandTimer);
-                pendingCommandTimer = null;
-            }
-            const status = pendingCommandCard.querySelector('[data-role="pendingStatus"]');
-            const walker = pendingCommandCard.querySelector('[data-role="pendingWalker"]');
-            status.textContent = finalText || "Reponse recue, traitement termine.";
-            walker.textContent = "OK";
-            pendingCommandCard = null;
-        }
+    function renderAppList(payload) {
+      const apps = Array.isArray(payload?.apps) ? payload.apps : [];
+      if (!apps.length) return "<p class=\"text-sm text-cmd-mute\">Aucune app detectee.</p>";
+      return `
+        <div class="space-y-2">
+          <p class="text-xs uppercase tracking-[0.12em] text-cmd-mute">${apps.length} application(s)</p>
+          <div class="grid gap-2 sm:grid-cols-2">${apps.map((app) => `
+            <div class="rounded-xl border border-cmd-line bg-cmd-bg2/55 p-3">
+              <p class="text-sm font-bold text-cmd-text">${escapeHtml(app.name || "unknown")}</p>
+              <p class="mt-1 text-xs text-cmd-mute">${escapeHtml(app.region || "n/a")} · ${escapeHtml(app.status || "unknown")}</p>
+              ${app.url ? `<p class="mt-2 text-xs text-cmd-amber break-all">${escapeHtml(app.url)}</p>` : ""}
+            </div>
+          `).join("")}</div>
+        </div>
+      `;
+    }
 
-        function createPendingCommandCard(command) {
-            clearPendingCommandCard();
-            const li = document.createElement("li");
-            li.className = "motion-safe:animate-fadeSlide w-full max-w-[96%] rounded-2xl border border-amber-200/30 bg-gradient-to-br from-slate-900 to-amber-950/40 p-4 shadow-card sm:max-w-[84%]";
-            li.innerHTML = `
-                <div class="mb-2 flex items-center justify-between gap-2">
-                    <p class="text-sm font-bold text-amber-100">Commande en cours</p>
-                    <span class="rounded-full border border-amber-200/30 bg-amber-300/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100">processing</span>
-                </div>
-                <p class="text-xs text-amber-100/80">"${escapeHtml(command)}"</p>
-                <div class="mt-3 relative h-5 rounded-full border border-white/10 bg-slate-950/40">
-                    <div class="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/20"></div>
-                    <span class="absolute left-[2%] top-1/2 -translate-y-1/2 text-sm transition-all duration-300" data-role="pendingWalker">o/</span>
-                </div>
-                <p class="mt-2 text-xs text-slate-200" data-role="pendingStatus">Je traite ta commande et je prepare une reponse claire...</p>
-            `;
+    function renderAppDetails(payload) {
+      const app = payload?.app;
+      if (!app || typeof app !== "object") return "";
+      const fields = [
+        ["Name", app.name],
+        ["Region", app.region],
+        ["Status", app.status],
+        ["URL", app.url],
+        ["Stack", app.stack]
+      ].filter((item) => item[1]);
+      return `
+        <div class="rounded-xl border border-cmd-line bg-cmd-bg2/55 p-3">
+          <p class="text-xs uppercase tracking-[0.12em] text-cmd-mute">Application Overview</p>
+          <div class="mt-2 grid gap-2 sm:grid-cols-2">${fields.map(([k, v]) => `
+            <div>
+              <p class="text-[10px] uppercase tracking-wide text-cmd-mute">${escapeHtml(k)}</p>
+              <p class="text-xs text-cmd-text break-all">${escapeHtml(String(v))}</p>
+            </div>
+          `).join("")}</div>
+        </div>
+      `;
+    }
 
-            messages.appendChild(li);
-            messages.scrollTop = messages.scrollHeight;
-            pendingCommandCard = li;
+    function renderDeployments(payload) {
+      const deployments = Array.isArray(payload?.deployments) ? payload.deployments : [];
+      const deployment = payload?.deployment;
+      if (!deployments.length && (!deployment || typeof deployment !== "object")) return "";
 
-            let progress = 2;
-            pendingCommandTimer = setInterval(() => {
-                if (!pendingCommandCard) return;
-                progress = Math.min(progress + 8, 92);
-                pendingCommandCard.querySelector('[data-role="pendingWalker"]').style.left = `calc(${progress}% - 10px)`;
-            }, 320);
-        }
+      if (deployments.length) {
+        return `
+          <div class="space-y-2">
+            <p class="text-xs uppercase tracking-[0.12em] text-cmd-mute">Recent Deployments</p>
+            <div class="space-y-2">${deployments.slice(0, 5).map((dep) => `
+              <div class="rounded-xl border border-cmd-line bg-cmd-bg2/55 p-3">
+                <p class="text-sm font-bold text-cmd-text">${escapeHtml(dep.id || "deployment")}</p>
+                <p class="mt-1 text-xs text-cmd-mute">${escapeHtml(dep.status || "unknown")} · ${escapeHtml(dep.git_ref || "no-ref")}</p>
+                ${dep.created_at ? `<p class="mt-1 text-[11px] text-cmd-mute">${escapeHtml(dep.created_at)}</p>` : ""}
+              </div>
+            `).join("")}</div>
+          </div>
+        `;
+      }
 
-        ws.onmessage = function(event) {
-            setComposerLocked(false);
-            clearPendingCommandCard("Reponse recue.");
-            let data = null;
-            try {
-                data = JSON.parse(event.data);
-            } catch (err) {
-                data = null;
-            }
+      return `
+        <div class="rounded-xl border border-cmd-line bg-cmd-bg2/55 p-3">
+          <p class="text-xs uppercase tracking-[0.12em] text-cmd-mute">Deployment Overview</p>
+          <p class="mt-1 text-sm font-bold text-cmd-text">${escapeHtml(deployment.id || "deployment")}</p>
+          <p class="mt-1 text-xs text-cmd-mute">${escapeHtml(deployment.status || "unknown")} · ${escapeHtml(deployment.git_ref || "no-ref")}</p>
+        </div>
+      `;
+    }
 
-            if (data && data.type && data.deployment_id) {
-                handleDeploymentEvent(data);
-                return;
-            }
+    function renderLogsPanel(envelope, fallbackText) {
+      const payload = envelope?.structured_payload || {};
+      const chunks = [];
+      if (typeof payload.logs === "string" && payload.logs.trim()) chunks.push(payload.logs.trim());
+      if (Array.isArray(payload.log_lines) && payload.log_lines.length) chunks.push(payload.log_lines.join("\n"));
+      if (typeof envelope?.human_message === "string" && envelope.human_message.includes("\n")) chunks.push(envelope.human_message);
+      if (!chunks.length && fallbackText) chunks.push(fallbackText);
+      const output = chunks.join("\n\n").trim();
+      if (!output) return "";
 
-            appendMessage("bot", event.data);
-        };
+      return `
+        <div class="rounded-xl border border-cmd-line bg-[#0d0b08] p-3">
+          <p class="mb-2 text-xs uppercase tracking-[0.12em] text-cmd-mute">Terminal Output</p>
+          <pre class="max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs text-cmd-green">${escapeHtml(output)}</pre>
+        </div>
+      `;
+    }
 
-        function statusBadgeClasses(status) {
-            if (status === "success") return "border-emerald-200/35 bg-emerald-300/20 text-emerald-100";
-            if (status === "warning") return "border-amber-200/35 bg-amber-300/20 text-amber-100";
-            if (status === "error") return "border-rose-200/35 bg-rose-300/20 text-rose-100";
-            if (status === "requires_confirmation") return "border-fuchsia-200/35 bg-fuchsia-300/20 text-fuchsia-100";
-            return "border-white/15 bg-white/10 text-slate-200";
-        }
+    function renderValidationCard(envelope) {
+      const missing = Array.isArray(envelope?.structured_payload?.missing_entities) ? envelope.structured_payload.missing_entities : [];
+      if (!missing.length) return "";
+      return `
+        <div class="rounded-xl border border-cmd-amber/45 bg-cmd-amber/10 p-3">
+          <p class="text-xs font-bold uppercase tracking-[0.12em] text-cmd-amber">Missing Fields</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            ${missing.map((m) => `<span class="rounded-full border border-cmd-amber/45 px-2 py-1 text-xs text-cmd-amber">${escapeHtml(m)}</span>`).join("")}
+          </div>
+        </div>
+      `;
+    }
 
-        function eventToneClasses(eventType, status) {
-            if ((eventType || "").startsWith("deployments.") || eventType === "legacy.show_logs") return "border-cyan-300/40";
-            if ((eventType || "").startsWith("apps.")) return "border-sky-300/40";
-            if (status === "error") return "border-rose-300/40";
-            if (status === "warning") return "border-amber-300/40";
-            return "border-white/15";
-        }
+    function renderConfirmationCard(envelope) {
+      if (envelope?.status !== "requires_confirmation") return "";
+      const token = envelope?.structured_payload?.confirm_token;
+      if (!token) return "";
+      return `
+        <div class="rounded-xl border border-cmd-red/55 bg-cmd-red/10 p-3">
+          <p class="text-xs font-bold uppercase tracking-[0.12em] text-cmd-red">Confirmation Required</p>
+          <p class="mt-1 text-sm text-cmd-text">Action destructive detectee. Execute la commande suivante pour confirmer :</p>
+          <code class="mt-2 inline-block rounded border border-cmd-red/50 bg-[#281512] px-2 py-1 font-mono text-xs text-cmd-red">confirm ${escapeHtml(token)}</code>
+        </div>
+      `;
+    }
 
-        function formatEventLabel(eventType) {
-            return (eventType || "system.message").replaceAll(".", " · ");
-        }
+    function renderSummaryGrid(envelope) {
+      const payload = envelope?.structured_payload || {};
+      const summary = mapSummaryFields(payload);
+      if (!summary.length) return "";
+      return `
+        <div class="grid gap-2 sm:grid-cols-2">${summary.map((item) => `
+          <div class="rounded-xl border border-cmd-line bg-cmd-bg2/55 px-3 py-2">
+            <p class="text-[10px] uppercase tracking-wide text-cmd-mute">${escapeHtml(item.k)}</p>
+            <p class="mt-0.5 text-xs text-cmd-text break-all">${escapeHtml(item.v)}</p>
+          </div>
+        `).join("")}</div>
+      `;
+    }
 
-        function extractPayloadHighlights(payload) {
-            if (!payload || typeof payload !== "object") return [];
-            const highlights = [];
-            const app = payload.app || {};
-            const deployment = payload.deployment || {};
-            const preview = payload.preview;
+    function renderActions(envelope) {
+      const actions = Array.isArray(envelope?.next_actions) ? envelope.next_actions.filter(Boolean) : [];
+      if (!actions.length) return "";
+      return `
+        <div>
+          <p class="mb-2 text-[10px] uppercase tracking-[0.12em] text-cmd-mute">Next Actions</p>
+          <div class="flex flex-wrap gap-2">${actions.map((a) => `<code class="rounded-full border border-cmd-green/35 bg-cmd-green/12 px-2 py-1 font-mono text-xs text-cmd-green">${escapeHtml(a)}</code>`).join("")}</div>
+        </div>
+      `;
+    }
 
-            if (app.name) highlights.push({ k: "App", v: app.name });
-            if (app.region) highlights.push({ k: "Region", v: app.region });
-            if (app.url) highlights.push({ k: "URL", v: app.url });
-            if (deployment.id) highlights.push({ k: "Deployment", v: deployment.id });
-            if (deployment.status) highlights.push({ k: "Statut deploy", v: deployment.status });
-            if (deployment.git_ref) highlights.push({ k: "Git ref", v: deployment.git_ref });
-            if (typeof preview === "string" && preview.trim()) highlights.push({ k: "Action", v: preview });
+    function createDebugDetails(envelope, rawText) {
+      const payloadText = envelope ? JSON.stringify(envelope.structured_payload || {}, null, 2) : rawText;
+      return `
+        <details class="rounded-xl border border-cmd-line bg-cmd-bg2/45 px-3 py-2">
+          <summary class="cursor-pointer text-xs font-semibold text-cmd-mute">Debug JSON</summary>
+          <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs text-cmd-mute">${escapeHtml(payloadText)}</pre>
+        </details>
+      `;
+    }
 
-            if (!highlights.length) {
-                for (const [k, v] of Object.entries(payload).slice(0, 5)) {
-                    if (v === null || v === undefined) continue;
-                    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
-                        highlights.push({ k, v: String(v) });
-                    }
-                }
-            }
-            return highlights.slice(0, 6);
-        }
+    function clearPendingCommandCard(finalText) {
+      if (!pendingCommandCard) return;
+      if (pendingCommandTimer) {
+        clearInterval(pendingCommandTimer);
+        pendingCommandTimer = null;
+      }
+      const status = pendingCommandCard.querySelector('[data-role="pendingStatus"]');
+      const walker = pendingCommandCard.querySelector('[data-role="pendingWalker"]');
+      status.textContent = finalText || "Execution terminee.";
+      walker.textContent = "OK";
+      pendingCommandCard = null;
+    }
 
-        function parseWsEnvelope(text) {
-            try {
-                const parsed = JSON.parse(text);
-                if (!parsed || typeof parsed !== "object") return null;
-                if (!parsed.version || !parsed.event_type || !parsed.status) return null;
-                return parsed;
-            } catch (e) {
-                return null;
-            }
-        }
+    function createPendingCommandCard(command) {
+      clearPendingCommandCard();
+      const li = document.createElement("li");
+      li.className = "motion-safe:animate-riseIn w-full max-w-[96%] rounded-2xl border border-cmd-amber/45 bg-cmd-bg2/65 p-4 shadow-panel sm:max-w-[86%]";
+      li.innerHTML = `
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <p class="text-sm font-bold text-cmd-amber">Commande en cours</p>
+          <span class="rounded-full border border-cmd-amber/45 bg-cmd-amber/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cmd-amber">processing</span>
+        </div>
+        <p class="font-mono text-xs text-cmd-mute">${escapeHtml(command)}</p>
+        <div class="mt-3 relative h-5 rounded-full border border-cmd-line bg-cmd-bg0/55">
+          <div class="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-cmd-line"></div>
+          <span class="absolute left-[2%] top-1/2 -translate-y-1/2 text-sm transition-all duration-300" data-role="pendingWalker">o/</span>
+        </div>
+        <p class="mt-2 text-xs text-cmd-mute" data-role="pendingStatus">Traitement de la commande en cours...</p>
+      `;
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight;
+      pendingCommandCard = li;
 
-        function classifyBotMessage(text, envelope) {
-            if (envelope) {
-                const ev = String(envelope.event_type || "");
-                if (ev.startsWith("deployments.") || ev === "legacy.show_logs") return "deploy";
-                if (ev.includes("log")) return "logs";
-                if (ev.startsWith("apps.") || ev.startsWith("domains.") || ev.startsWith("events.")) return "context";
-            }
-            const lower = (text || "").toLowerCase();
-            if (lower.includes("log") || lower.includes("tail")) return "logs";
-            if (lower.includes("context") || lower.includes("analyse") || lower.includes("analysis")) return "context";
-            if (lower.includes("deploy") || lower.includes("building") || lower.includes("starting")) return "deploy";
-            return "default";
-        }
+      let progress = 2;
+      pendingCommandTimer = setInterval(() => {
+        if (!pendingCommandCard) return;
+        progress = Math.min(progress + 8, 92);
+        pendingCommandCard.querySelector('[data-role="pendingWalker"]').style.left = `calc(${progress}% - 10px)`;
+      }, 320);
+    }
 
-        function getBotExplanation(intent, text) {
-            if (intent === "deploy") return "Je suis en train d'orchestrer le pipeline de deploiement et de suivre les etapes en temps reel.";
-            if (intent === "logs") return "Je recupere les derniers logs utiles pour te donner une vue rapide de ce qui se passe.";
-            if (intent === "context") return "Je fais une lecture du contexte applicatif pour expliquer l'etat et les impacts possibles.";
-            if ((text || "").toLowerCase().includes("error") || (text || "").toLowerCase().includes("failed")) {
-                return "Une erreur est remontee. Je te donne le signal principal et la sortie brute pour debug.";
-            }
-            if (lastUserCommand) return `Commande detectee: "${lastUserCommand}". Voici le resultat interprete.`;
-            return "Voici le resultat de l'action, resume de facon lisible.";
-        }
+    function appendBotCard(rawText) {
+      const envelope = parseWsEnvelope(rawText);
+      const textForDisplay = envelope?.human_message || rawText;
+      const eventType = envelope?.event_type || "system.message";
+      const status = envelope?.status || "success";
+      const riskLevel = envelope?.risk_level || "none";
+      const toneClass = eventToneClasses(eventType, status);
 
-        function escapeHtml(value) {
-            return (value || "")
-                .replaceAll("&", "&amp;")
-                .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;")
-                .replaceAll('"', "&quot;")
-                .replaceAll("'", "&#39;");
-        }
+      const li = document.createElement("li");
+      li.className = `motion-safe:animate-riseIn w-full max-w-[96%] rounded-2xl border bg-cmd-bg1/90 p-4 shadow-panel sm:max-w-[86%] ${toneClass}`;
 
-        function appendBotCard(text) {
-            const envelope = parseWsEnvelope(text);
-            const intent = classifyBotMessage(text, envelope);
-            const safeText = escapeHtml(text);
+      const commandSummary = `
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="rounded-full border border-cmd-line bg-cmd-bg2/55 px-2 py-0.5 text-[10px] uppercase tracking-wide text-cmd-mute">${escapeHtml(formatEventLabel(eventType))}</span>
+          <span class="rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusBadgeClasses(status)}">${escapeHtml(status)}</span>
+          <span class="rounded-full border border-cmd-line bg-cmd-bg2/55 px-2 py-0.5 text-[10px] uppercase tracking-wide text-cmd-mute">risk: ${escapeHtml(riskLevel)}</span>
+        </div>
+      `;
 
-            if (intent === "logs" && activeLogsCard) {
-                const pre = activeLogsCard.querySelector('[data-role="logsBody"]');
-                pre.textContent = pre.textContent ? `${pre.textContent}\n${text}` : text;
-                messages.scrollTop = messages.scrollHeight;
-                return;
-            }
+      const payload = envelope?.structured_payload || {};
+      const showAppList = eventType === "apps.list";
+      const showAppDetails = eventType === "apps.get" || eventType.startsWith("apps.");
+      const showDeployments = eventType.startsWith("deployments.");
+      const showValidation = eventType === "command.validation_error";
+      const showLogs = eventType === "deployments.output" || eventType.includes("log") || rawText.toLowerCase().includes("log");
 
-            if (intent !== "deploy" && intent !== "logs" && activeBotCard && activeBotIntent === intent) {
-                const body = activeBotCard.querySelector('[data-role="botBody"]');
-                body.textContent = body.textContent ? `${body.textContent}\n${text}` : text;
-                messages.scrollTop = messages.scrollHeight;
-                return;
-            }
+      li.innerHTML = `
+        <div class="space-y-3">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cmd-line bg-cmd-bg2 text-xs font-black text-cmd-amber">AI</div>
+            <div class="min-w-0 flex-1 space-y-3">
+              <div>
+                <p class="text-sm font-bold text-cmd-text">Ops Assistant</p>
+                ${commandSummary}
+              </div>
+              <pre class="rounded-xl border border-cmd-line bg-cmd-bg2/55 px-3 py-2 text-sm text-cmd-text whitespace-pre-wrap">${escapeHtml(textForDisplay)}</pre>
+              ${renderConfirmationCard(envelope)}
+              ${showValidation ? renderValidationCard(envelope) : ""}
+              ${showAppList ? renderAppList(payload) : ""}
+              ${showAppDetails ? renderAppDetails(payload) : ""}
+              ${showDeployments ? renderDeployments(payload) : ""}
+              ${showLogs ? renderLogsPanel(envelope, rawText) : ""}
+              ${renderSummaryGrid(envelope)}
+              ${renderActions(envelope)}
+              ${createDebugDetails(envelope, rawText)}
+            </div>
+          </div>
+        </div>
+      `;
 
-            const li = document.createElement("li");
-            li.className = "motion-safe:animate-fadeSlide w-full max-w-[96%] rounded-2xl border bg-slate-900/80 p-4 shadow-card sm:max-w-[84%]";
-            li.classList.add(eventToneClasses(envelope?.event_type, envelope?.status));
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-            const explanation = getBotExplanation(intent, envelope?.human_message || text);
-            const isLong = (text || "").length > 180 || (text || "").includes("\n");
-            const rawPayload = envelope ? JSON.stringify(envelope.structured_payload || {}, null, 2) : text;
-            const safePayload = escapeHtml(rawPayload);
-            const actions = envelope && Array.isArray(envelope.next_actions) ? envelope.next_actions.filter(Boolean) : [];
-            const highlights = envelope ? extractPayloadHighlights(envelope.structured_payload || {}) : [];
+    function appendUserMessage(text) {
+      const li = document.createElement("li");
+      li.className = "motion-safe:animate-riseIn ml-auto max-w-[92%] rounded-2xl border border-cmd-amber/40 bg-gradient-to-br from-[#f2b96c] to-[#e1a85e] px-4 py-3 text-sm font-semibold leading-relaxed text-cmd-bg0 shadow-panel sm:max-w-[80%] sm:text-[15px]";
+      li.textContent = text;
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-            li.innerHTML = `
-                <div class="flex items-start gap-3">
-                    <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-300 to-emerald-300 text-xs font-black text-slate-900">AI</div>
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">
-                            <p class="text-sm font-bold text-white">Assistant Ops</p>
-                            <span class="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">${intent}</span>
-                            ${envelope ? `<span class="rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusBadgeClasses(envelope.status)}">${escapeHtml(envelope.status)}</span>` : ""}
-                        </div>
-                        ${envelope ? `<p class="mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-400">${escapeHtml(formatEventLabel(envelope.event_type))}</p>` : ""}
-                        <p class="mt-1 text-sm text-slate-200">${explanation}</p>
-                        ${envelope && envelope.human_message ? `<pre class="mt-2 rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 whitespace-pre-wrap">${escapeHtml(envelope.human_message)}</pre>` : ""}
-                        ${highlights.length ? `<div class="mt-3 grid gap-2 sm:grid-cols-2">${highlights.map((item) => `<div class="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2"><p class="text-[10px] uppercase tracking-wide text-slate-400">${escapeHtml(item.k)}</p><p class="mt-0.5 text-xs text-slate-100 break-all">${escapeHtml(item.v)}</p></div>`).join("")}</div>` : ""}
-                        ${actions.length ? `<div class="mt-3 flex flex-wrap gap-2">${actions.map((action) => `<code class="rounded-full border border-sky-200/30 bg-sky-300/10 px-2 py-1 text-xs text-sky-100">${escapeHtml(action)}</code>`).join("")}</div>` : ""}
-                        ${(isLong || envelope)
-                            ? `<details class="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-2">
-                                <summary class="cursor-pointer text-xs font-semibold text-slate-300">Details techniques (JSON)</summary>
-                                <pre class="mt-2 max-h-72 overflow-auto whitespace-pre-wrap text-xs text-slate-200" ${intent === "logs" ? 'data-role="logsBody"' : ""}>${safePayload}</pre>
-                            </details>`
-                            : `<pre class="mt-2 rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-slate-100 whitespace-pre-wrap" ${intent === "logs" ? 'data-role="logsBody"' : 'data-role="botBody"'}>${safeText}</pre>`
-                        }
-                    </div>
-                </div>
-            `;
+    function appendSystemWelcome() {
+      const li = document.createElement("li");
+      li.className = "motion-safe:animate-riseIn w-full max-w-[96%] rounded-2xl border border-cmd-line bg-cmd-bg2/50 p-4 shadow-panel sm:max-w-[86%]";
+      li.innerHTML = `
+        <p class="text-sm font-bold text-cmd-amber">Mission Ready</p>
+        <p class="mt-1 text-sm text-cmd-text">Console prete. Lance une commande pour afficher un rendu demo-friendly avec resume, signaux, et actions suivantes.</p>
+      `;
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-            messages.appendChild(li);
-            if (intent === "logs") activeLogsCard = li;
-            else activeLogsCard = null;
-            if (intent !== "deploy" && intent !== "logs" && !isLong) {
-                activeBotCard = li;
-                activeBotIntent = intent;
-            } else {
-                activeBotCard = null;
-                activeBotIntent = null;
-            }
-            messages.scrollTop = messages.scrollHeight;
-        }
+    function createDeploymentCard(data) {
+      const id = data.deployment_id;
+      if (deploymentCards.has(id)) return deploymentCards.get(id);
 
-        function appendMessage(kind, text) {
-            if (kind === "bot") {
-                appendBotCard(text);
-                return;
-            }
+      const li = document.createElement("li");
+      li.className = "motion-safe:animate-riseIn w-full max-w-[96%] rounded-2xl border border-cmd-amber/45 bg-cmd-bg2/65 p-4 shadow-panel sm:max-w-[86%]";
+      li.dataset.deploymentId = id;
 
-            const li = document.createElement('li');
-            li.className = "motion-safe:animate-fadeSlide max-w-[92%] rounded-2xl border px-4 py-3 text-sm leading-relaxed shadow-sm sm:max-w-[80%] sm:text-[15px]";
+      const appName = data.app_name || id;
+      li.innerHTML = `
+        <div class="mb-2 flex items-center justify-between gap-3 text-sm">
+          <div class="font-bold tracking-wide text-cmd-amber">Deployment ${escapeHtml(appName)}</div>
+          <div class="font-mono text-xs text-cmd-mute" data-role="elapsed">00:00</div>
+        </div>
+        <div class="mb-3 h-2.5 overflow-hidden rounded-full bg-cmd-bg0/55">
+          <div class="h-full w-0 bg-gradient-to-r from-cmd-amber to-cmd-green transition-all duration-300" data-role="bar"></div>
+        </div>
+        <div class="mb-3 relative h-5 rounded-full border border-cmd-line bg-cmd-bg0/65">
+          <div class="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-cmd-line"></div>
+          <span class="absolute top-1/2 -translate-y-1/2 text-sm transition-all duration-300" data-role="walker">o/</span>
+        </div>
+        <div class="mb-2 grid grid-cols-5 gap-1.5 text-[10px] text-cmd-mute sm:text-[11px]">
+          <div class="step rounded-full bg-cmd-bg0/65 px-1 py-1 text-center" data-step="queued">Queued</div>
+          <div class="step rounded-full bg-cmd-bg0/65 px-1 py-1 text-center" data-step="building">Build</div>
+          <div class="step rounded-full bg-cmd-bg0/65 px-1 py-1 text-center" data-step="pushing">Push</div>
+          <div class="step rounded-full bg-cmd-bg0/65 px-1 py-1 text-center" data-step="starting">Start</div>
+          <div class="step rounded-full bg-cmd-bg0/65 px-1 py-1 text-center" data-step="success">Done</div>
+        </div>
+        <div class="flex items-center justify-between gap-2 text-xs sm:text-sm">
+          <div class="min-w-0 flex items-center gap-2">
+            <span class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-cmd-mute/35 border-t-cmd-amber" data-role="spinner"></span>
+            <span class="font-semibold text-cmd-amber" data-role="guy">running</span>
+            <span class="max-w-[200px] truncate text-cmd-text sm:max-w-[420px]" data-role="statusText">Deployment started...</span>
+          </div>
+          <div class="text-cmd-mute" data-role="progressText">0%</div>
+        </div>
+      `;
 
-            li.classList.add(
-                "ml-auto",
-                "border-sky-100/70",
-                "bg-gradient-to-br",
-                "from-sky-100",
-                "to-emerald-100",
-                "text-slate-900",
-                "shadow-md",
-                "shadow-sky-500/20"
-            );
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight;
+      deploymentCards.set(id, li);
 
-            li.textContent = text;
-            messages.appendChild(li);
-            messages.scrollTop = messages.scrollHeight;
-        }
+      const startedAt = Date.now();
+      const timer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+        const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+        const ss = String(elapsed % 60).padStart(2, "0");
+        li.querySelector('[data-role="elapsed"]').textContent = `${mm}:${ss}`;
+      }, 1000);
+      deploymentTimers.set(id, timer);
+      return li;
+    }
 
-        function createDeploymentCard(data) {
-            const id = data.deployment_id;
-            if (deploymentCards.has(id)) return deploymentCards.get(id);
+    function markSteps(card, status, final, isError) {
+      const steps = card.querySelectorAll(".step");
+      const idx = statusOrder.indexOf(status);
+      steps.forEach((stepEl) => {
+        const step = stepEl.dataset.step;
+        const stepIdx = statusOrder.indexOf(step);
+        stepEl.className = "step rounded-full bg-cmd-bg0/65 px-1 py-1 text-center";
 
-            const li = document.createElement("li");
-            li.className = "motion-safe:animate-fadeSlide w-full max-w-[96%] rounded-2xl border border-sky-200/30 bg-gradient-to-br from-slate-900 to-sky-950/70 p-4 shadow-card sm:max-w-[84%]";
-            li.dataset.deploymentId = id;
+        if (idx >= 0 && stepIdx < idx) stepEl.classList.add("bg-cmd-green/80", "font-bold", "text-cmd-bg0");
+        if (!final && step === status) stepEl.classList.add("bg-cmd-amber/70", "font-bold", "text-cmd-bg0");
+        if (final && !isError && step === "success") stepEl.classList.add("bg-cmd-green", "font-bold", "text-cmd-bg0");
+        if (final && isError && stepIdx <= Math.max(idx, 3)) stepEl.classList.add("bg-cmd-red/70", "font-bold", "text-cmd-bg0");
+      });
+    }
 
-            const appName = data.app_name || id;
-            li.innerHTML = `
-                <div class="mb-2 flex items-center justify-between gap-3 text-sm">
-                    <div class="font-bold tracking-wide text-sky-100">Deployment ${appName}</div>
-                    <div class="text-xs text-sky-200/85" data-role="elapsed">00:00</div>
-                </div>
-                <div class="mb-3 h-2.5 overflow-hidden rounded-full bg-white/15">
-                    <div class="h-full w-0 bg-gradient-to-r from-sky-300 to-emerald-300 transition-all duration-300" data-role="bar"></div>
-                </div>
-                <div class="mb-3 relative h-5 rounded-full border border-white/10 bg-slate-950/40">
-                    <div class="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/20"></div>
-                    <span class="absolute top-1/2 -translate-y-1/2 text-sm transition-all duration-300" data-role="walker">o/</span>
-                </div>
-                <div class="mb-2 grid grid-cols-5 gap-1.5 text-[10px] text-sky-100/80 sm:text-[11px]" data-role="steps">
-                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="queued">Queued</div>
-                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="building">Build</div>
-                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="pushing">Push</div>
-                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="starting">Start</div>
-                    <div class="step rounded-full bg-white/10 px-1 py-1 text-center" data-step="success">Done</div>
-                </div>
-                <div class="flex items-center justify-between gap-2 text-xs sm:text-sm">
-                    <div class="min-w-0 flex items-center gap-2">
-                        <span class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-200/40 border-t-cyan-200" data-role="spinner"></span>
-                        <span class="font-semibold text-sky-100" data-role="guy">en cours</span>
-                        <span class="max-w-[200px] truncate text-slate-100 sm:max-w-[420px]" data-role="statusText">Deployment started...</span>
-                    </div>
-                    <div class="text-sky-100/85" data-role="progressText">0%</div>
-                </div>
-            `;
+    function finalizeCard(id, card, text, progress, isError) {
+      card.querySelector('[data-role="bar"]').style.width = `${progress}%`;
+      card.querySelector('[data-role="progressText"]').textContent = `${progress}%`;
+      card.querySelector('[data-role="statusText"]').textContent = text;
+      card.querySelector('[data-role="spinner"]').classList.add("hidden");
+      card.querySelector('[data-role="guy"]').textContent = isError ? "blocked" : "done";
+      const timer = deploymentTimers.get(id);
+      if (timer) {
+        clearInterval(timer);
+        deploymentTimers.delete(id);
+      }
+    }
 
-            messages.appendChild(li);
-            messages.scrollTop = messages.scrollHeight;
-            deploymentCards.set(id, li);
+    function handleDeploymentEvent(data) {
+      const id = data.deployment_id;
+      const card = createDeploymentCard(data);
+      const isError = Boolean(data.error_kind) || (data.final && data.status !== "success");
+      const text = data.phase_label || data.message || data.status || "In progress";
+      const progress = normalizeProgress(data);
+      const final = Boolean(data.final) || data.type === "deployment_finished";
 
-            const startedAt = Date.now();
-            const timer = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-                const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
-                const ss = String(elapsed % 60).padStart(2, "0");
-                li.querySelector('[data-role="elapsed"]').textContent = `${mm}:${ss}`;
-            }, 1000);
-            deploymentTimers.set(id, timer);
-            return li;
-        }
+      card.querySelector('[data-role="bar"]').style.width = `${progress}%`;
+      card.querySelector('[data-role="progressText"]').textContent = `${progress}%`;
+      card.querySelector('[data-role="statusText"]').textContent = text;
+      card.querySelector('[data-role="walker"]').style.left = `calc(${Math.max(2, Math.min(96, progress))}% - 10px)`;
+      markSteps(card, data.status, final, isError);
 
-        function normalizeProgress(data) {
-            if (typeof data.progress === "number") return data.progress;
-            if (statusProgress[data.status] !== undefined) return statusProgress[data.status];
-            return 0;
-        }
+      if (final) {
+        finalizeCard(id, card, text, progress, isError);
+        appendBotCard(isError ? `[ERROR] Deployment failed for ${data.app_name || id}.` : `[OK] Deployment successful for ${data.app_name || id}.`);
+      } else if (data.type === "deployment_started") {
+        appendBotCard(`Deployment launched for ${data.app_name || id}.`);
+      }
+    }
 
-        function markSteps(card, status, final, isError) {
-            const steps = card.querySelectorAll(".step");
-            const idx = statusOrder.indexOf(status);
+    function sendMessage(event) {
+      event.preventDefault();
+      if (isAwaitingResponse) return;
+      if (!inputEl.value) return;
 
-            steps.forEach((stepEl) => {
-                const step = stepEl.dataset.step;
-                const stepIdx = statusOrder.indexOf(step);
-                stepEl.className = "step rounded-full bg-white/10 px-1 py-1 text-center";
+      appendUserMessage(inputEl.value);
+      lastUserCommand = inputEl.value.trim();
+      createPendingCommandCard(lastUserCommand);
+      setComposerLocked(true);
+      ws.send(inputEl.value);
+      inputEl.value = "";
+    }
 
-                if (idx >= 0 && stepIdx < idx) stepEl.classList.add("bg-emerald-300", "font-extrabold", "text-slate-900");
-                if (!final && step === status) stepEl.classList.add("bg-sky-300/35", "font-bold", "text-white");
-                if (final && !isError && step === "success") stepEl.classList.add("bg-emerald-300", "font-extrabold", "text-slate-900");
-                if (final && isError && stepIdx <= Math.max(idx, 3)) stepEl.classList.add("bg-amber-300", "font-bold", "text-slate-900");
-            });
-        }
+    ws.onopen = function() {
+      setConnectionState("connected");
+      appendSystemWelcome();
+    };
 
-        function finalizeCard(id, card, text, progress, isError) {
-            card.querySelector('[data-role="bar"]').style.width = `${progress}%`;
-            card.querySelector('[data-role="progressText"]').textContent = `${progress}%`;
-            card.querySelector('[data-role="statusText"]').textContent = text;
-            card.querySelector('[data-role="spinner"]').classList.add("hidden");
-            card.querySelector('[data-role="guy"]').textContent = isError ? "bloque" : "termine";
-            const timer = deploymentTimers.get(id);
-            if (timer) {
-                clearInterval(timer);
-                deploymentTimers.delete(id);
-            }
-        }
+    ws.onclose = function() {
+      setConnectionState("closed");
+      setComposerLocked(true);
+    };
 
-        function handleDeploymentEvent(data) {
-            const id = data.deployment_id;
-            const card = createDeploymentCard(data);
-            const isError = Boolean(data.error_kind) || (data.final && data.status !== "success");
-            const text = data.phase_label || data.message || data.status || "In progress";
-            const progress = normalizeProgress(data);
-            const final = Boolean(data.final) || data.type === "deployment_finished";
+    ws.onerror = function() {
+      setConnectionState("closed");
+      appendBotCard("Connection error with websocket endpoint.");
+    };
 
-            card.querySelector('[data-role="bar"]').style.width = `${progress}%`;
-            card.querySelector('[data-role="progressText"]').textContent = `${progress}%`;
-            card.querySelector('[data-role="statusText"]').textContent = text;
-            card.querySelector('[data-role="walker"]').style.left = `calc(${Math.max(2, Math.min(96, progress))}% - 10px)`;
-            markSteps(card, data.status, final, isError);
+    ws.onmessage = function(event) {
+      setConnectionState("connected");
+      setComposerLocked(false);
+      clearPendingCommandCard("Reponse recue.");
 
-            if (final) {
-                finalizeCard(id, card, text, progress, isError);
-                appendMessage("bot", isError ? `[ERROR] Deployment failed for ${data.app_name || id}.` : `[OK] Deployment successful for ${data.app_name || id}.`);
-            } else if (data.type === "deployment_started") {
-                appendMessage("bot", `Deployment launched for ${data.app_name || id}.`);
-            }
-        }
+      let data = null;
+      try {
+        data = JSON.parse(event.data);
+      } catch (err) {
+        data = null;
+      }
 
-        function sendMessage(event) {
-            event.preventDefault();
-            if (isAwaitingResponse) return;
-            if (inputEl.value) {
-                appendMessage("user", inputEl.value);
-                lastUserCommand = inputEl.value.trim();
-                activeLogsCard = null;
-                activeBotCard = null;
-                activeBotIntent = null;
-                createPendingCommandCard(lastUserCommand);
-                setComposerLocked(true);
-                ws.send(inputEl.value);
-                inputEl.value = '';
-            }
-        }
-    </script>
+      if (data && data.type && data.deployment_id) {
+        handleDeploymentEvent(data);
+        return;
+      }
+
+      appendBotCard(event.data);
+    };
+
+    setConnectionState("connecting");
+    bootPromptChips();
+  </script>
 </body>
 </html>
