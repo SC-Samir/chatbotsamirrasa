@@ -113,6 +113,7 @@ class WebSocketV2Handler:
                     )
 
                 command = self._resolve_command(interpretation.decision.intent, text)
+                fallback_entities: Dict[str, str] = {}
                 if not command:
                     command, fallback_entities = self._rule_based_fallback(text)
                     if fallback_entities:
@@ -149,10 +150,15 @@ class WebSocketV2Handler:
                     continue
 
                 if command == "legacy.create_and_deploy":
+                    merged_for_legacy = self._normalize_entities(merged_entities)
+                    current_for_legacy = self._normalize_entities(dict(interpretation.entities.values))
+                    if fallback_entities:
+                        # When regex fallback matched, trust those extracted entities over noisy NLU entities.
+                        current_for_legacy = self._normalize_entities(fallback_entities)
                     entities_for_command = self._entities_for_command(
                         "apps.create",
-                        self._normalize_entities(merged_entities),
-                        self._normalize_entities(dict(interpretation.entities.values)),
+                        merged_for_legacy,
+                        current_for_legacy,
                     )
                     context = CommandContext(
                         session_id=session_id,
@@ -182,6 +188,9 @@ class WebSocketV2Handler:
                     continue
 
                 current_entities = dict(interpretation.entities.values)
+                if fallback_entities:
+                    # For regex-matched commands, use extracted fallback entities as authoritative current entities.
+                    current_entities = fallback_entities
                 entities_for_command = self._entities_for_command(
                     command,
                     self._normalize_entities(merged_entities),
