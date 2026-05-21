@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 from app.domain import Region
 from app.infrastructure.scalingo.http_client import ScalingoHTTPClient
@@ -12,6 +13,20 @@ class ScalingoOpsGateway:
 
     def _region(self, value: str) -> Region:
         return Region(value)
+
+    def _build_archive_source_url(self, github_repo: str, git_ref: str) -> str:
+        repo = github_repo[:-4] if github_repo.endswith(".git") else github_repo
+        repo = repo.rstrip("/")
+        parsed = urlparse(repo)
+
+        if parsed.netloc.lower() == "github.com":
+            path_parts = [part for part in parsed.path.split("/") if part]
+            if len(path_parts) >= 2:
+                owner, repository = path_parts[0], path_parts[1]
+                return f"https://codeload.github.com/{owner}/{repository}/tar.gz/refs/heads/{git_ref}"
+
+        # Fallback that still works for generic GitHub-like hosts.
+        return f"{repo}/archive/{git_ref}.tar.gz"
 
     def apps_list(self, region: str) -> Dict[str, Any]:
         result = self.client.request("GET", self._region(region), "/v1/apps")
@@ -62,10 +77,7 @@ class ScalingoOpsGateway:
         if source_url:
             payload["source_url"] = source_url
         elif github_repo:
-            repo = github_repo[:-4] if github_repo.endswith(".git") else github_repo
-            repo = repo.rstrip("/")
-            # GitHub archive URL format that works for both main/master and named refs.
-            payload["source_url"] = f"{repo}/archive/refs/heads/{git_ref}.tar.gz"
+            payload["source_url"] = self._build_archive_source_url(github_repo, git_ref)
         result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/deployments", json_payload=payload)
         return result.value if result.success and result.value else {}
 
