@@ -206,6 +206,32 @@
             return (eventType || "system.message").replaceAll(".", " · ");
         }
 
+        function extractPayloadHighlights(payload) {
+            if (!payload || typeof payload !== "object") return [];
+            const highlights = [];
+            const app = payload.app || {};
+            const deployment = payload.deployment || {};
+            const preview = payload.preview;
+
+            if (app.name) highlights.push({ k: "App", v: app.name });
+            if (app.region) highlights.push({ k: "Region", v: app.region });
+            if (app.url) highlights.push({ k: "URL", v: app.url });
+            if (deployment.id) highlights.push({ k: "Deployment", v: deployment.id });
+            if (deployment.status) highlights.push({ k: "Statut deploy", v: deployment.status });
+            if (deployment.git_ref) highlights.push({ k: "Git ref", v: deployment.git_ref });
+            if (typeof preview === "string" && preview.trim()) highlights.push({ k: "Action", v: preview });
+
+            if (!highlights.length) {
+                for (const [k, v] of Object.entries(payload).slice(0, 5)) {
+                    if (v === null || v === undefined) continue;
+                    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+                        highlights.push({ k, v: String(v) });
+                    }
+                }
+            }
+            return highlights.slice(0, 6);
+        }
+
         function parseWsEnvelope(text) {
             try {
                 const parsed = JSON.parse(text);
@@ -279,6 +305,7 @@
             const rawPayload = envelope ? JSON.stringify(envelope.structured_payload || {}, null, 2) : text;
             const safePayload = escapeHtml(rawPayload);
             const actions = envelope && Array.isArray(envelope.next_actions) ? envelope.next_actions.filter(Boolean) : [];
+            const highlights = envelope ? extractPayloadHighlights(envelope.structured_payload || {}) : [];
 
             li.innerHTML = `
                 <div class="flex items-start gap-3">
@@ -292,10 +319,11 @@
                         ${envelope ? `<p class="mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-400">${escapeHtml(formatEventLabel(envelope.event_type))}</p>` : ""}
                         <p class="mt-1 text-sm text-slate-200">${explanation}</p>
                         ${envelope && envelope.human_message ? `<pre class="mt-2 rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 whitespace-pre-wrap">${escapeHtml(envelope.human_message)}</pre>` : ""}
+                        ${highlights.length ? `<div class="mt-3 grid gap-2 sm:grid-cols-2">${highlights.map((item) => `<div class="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2"><p class="text-[10px] uppercase tracking-wide text-slate-400">${escapeHtml(item.k)}</p><p class="mt-0.5 text-xs text-slate-100 break-all">${escapeHtml(item.v)}</p></div>`).join("")}</div>` : ""}
                         ${actions.length ? `<div class="mt-3 flex flex-wrap gap-2">${actions.map((action) => `<code class="rounded-full border border-sky-200/30 bg-sky-300/10 px-2 py-1 text-xs text-sky-100">${escapeHtml(action)}</code>`).join("")}</div>` : ""}
                         ${(isLong || envelope)
-                            ? `<details class="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-2" ${intent === "logs" ? "open" : ""}>
-                                <summary class="cursor-pointer text-xs font-semibold text-slate-300">Voir la sortie brute</summary>
+                            ? `<details class="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-2">
+                                <summary class="cursor-pointer text-xs font-semibold text-slate-300">Details techniques (JSON)</summary>
                                 <pre class="mt-2 max-h-72 overflow-auto whitespace-pre-wrap text-xs text-slate-200" ${intent === "logs" ? 'data-role="logsBody"' : ""}>${safePayload}</pre>
                             </details>`
                             : `<pre class="mt-2 rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-slate-100 whitespace-pre-wrap" ${intent === "logs" ? 'data-role="logsBody"' : 'data-role="botBody"'}>${safeText}</pre>`
