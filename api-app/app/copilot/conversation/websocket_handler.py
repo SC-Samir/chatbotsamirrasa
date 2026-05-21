@@ -270,6 +270,11 @@ class WebSocketV2Handler:
     def _rule_based_fallback(text: str) -> tuple[Optional[str], Dict[str, str]]:
         s = text.strip()
         patterns = [
+            (
+                r"(?:create\s+and\s+deploy|create\s+app\s+and\s+deploy|create\s+then\s+deploy)\s+([a-z0-9][a-z0-9-]*)\s+(?:to|on|in)\s+([a-z0-9-]+)\s+(?:with|from|using)\s+(https?://[^\s]+)(?:\s+(?:branch|ref)\s+([A-Za-z0-9._/-]+))?",
+                "legacy.create_and_deploy",
+                ("app_name", "region", "github_repo", "git_ref"),
+            ),
             (r"(?:show|list|get)\s+env(?:ironment)?\s*(?:vars|variables)?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "env_vars.list", ("app_name", "region")),
             (r"(?:unset|delete|remove)\s+env\s+([A-Za-z_][A-Za-z0-9_]*)\s+(?:for|on)\s+([a-z0-9-]+)\s+(?:in|on)\s+([a-z0-9-]+)", "env_vars.unset", ("env_name", "app_name", "region")),
             (r"(?:restart|redeploy)\s+(?:app\s+)?([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.restart", ("app_name", "region")),
@@ -279,7 +284,13 @@ class WebSocketV2Handler:
         for pattern, command, keys in patterns:
             m = re.search(pattern, s, flags=re.IGNORECASE)
             if m:
-                return command, {k: m.group(i + 1).lower() for i, k in enumerate(keys)}
+                entities: Dict[str, str] = {}
+                for i, key in enumerate(keys):
+                    val = m.group(i + 1) if i + 1 <= (m.lastindex or 0) else None
+                    if not val:
+                        continue
+                    entities[key] = val.lower() if key != "github_repo" else val
+                return command, entities
         return None, {}
 
     @staticmethod
