@@ -1,4 +1,14 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: scalingoops-postgres
+    environment:
+      POSTGRES_DB: scalingoops
+      POSTGRES_USER: scalingoops
+      POSTGRES_PASSWORD: scalingoops
+    ports:
+      - "5432:5432"
+
   redis:
     image: redis:7-alpine
     container_name: scalingoops-redis
@@ -19,6 +29,8 @@ services:
       context: ../nlu-app
       dockerfile: Dockerfile
     container_name: scalingoops-nlu
+    env_file:
+      - ../.env
     environment:
       NLU_MODEL_PATH: ${NLU_MODEL_PATH:-models/model.joblib}
       RASA_AUTH_TOKEN: ${RASA_AUTH_TOKEN:-}
@@ -30,31 +42,37 @@ services:
       context: .
       dockerfile: Dockerfile.app
     container_name: scalingoops-app
+    env_file:
+      - ../.env
     depends_on:
+      - postgres
       - redis
       - nlu
     environment:
-      SCALINGO_API_TOKEN: ${SCALINGO_API_TOKEN:-}
       REDIS_URL: redis://redis:6379/0
+      MEMORY_POSTGRES_DSN: postgresql://scalingoops:scalingoops@postgres:5432/scalingoops
       RASA_URL: ${RASA_URL:-http://nlu:8000}
       RASA_TIMEOUT_MS: ${RASA_TIMEOUT_MS:-3000}
       RASA_AUTH_TOKEN: ${RASA_AUTH_TOKEN:-}
       DEBUG: ${DEBUG:-false}
     ports:
       - "8000:8000"
-    command: ["uv", "run", "--no-project", "gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+    command: ["uv", "run", "--no-project", "gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
 
   worker:
     build:
       context: .
       dockerfile: Dockerfile.app
     container_name: scalingoops-worker
+    env_file:
+      - ../.env
     depends_on:
+      - postgres
       - redis
       - nlu
     environment:
-      SCALINGO_API_TOKEN: ${SCALINGO_API_TOKEN:-}
       REDIS_URL: redis://redis:6379/0
+      MEMORY_POSTGRES_DSN: postgresql://scalingoops:scalingoops@postgres:5432/scalingoops
       RASA_URL: ${RASA_URL:-http://nlu:8000}
       RASA_TIMEOUT_MS: ${RASA_TIMEOUT_MS:-3000}
       RASA_AUTH_TOKEN: ${RASA_AUTH_TOKEN:-}

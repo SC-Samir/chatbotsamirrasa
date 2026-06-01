@@ -37,7 +37,7 @@ Command coverage reference: `SUPPORTED_COMMANDS.md`
 
 Legacy stack toggle:
 
-- `ENABLE_LEGACY_INTENT_STACK` (default `true`) keeps legacy `handlers/*` wiring available during migration.
+- WebSocket endpoint `/ws` is now strictly `ws.v2` (legacy `handlers/*` flow removed from runtime wiring).
 
 ## Lancement local
 

@@ -9,52 +9,60 @@ All commands return the stable `ws.v2` envelope:
 - `next_actions`
 - `risk_level`
 
+Destructive commands require `confirm <token>`.
+All mutating commands include an `Action preview` in `human_message` and `structured_payload.preview`.
+
 ## App
 - `apps.list` (requires: `region`)
 - `apps.get` (requires: `app_name`, `region`)
-- `apps.set_force_https` (requires: `app_name`, `region`, `enabled`; confirmation required)
-- `apps.set_router_logs` (requires: `app_name`, `region`, `enabled`; confirmation required)
-- `apps.set_sticky_session` (requires: `app_name`, `region`, `enabled`; confirmation required)
-- `apps.change_project` (requires: `app_name`, `region`, `project_id`; confirmation required)
+- `apps.create` (requires: `app_name`, `region`)
+- `apps.restart` (requires: `app_name`, `region`)
+- `apps.set_force_https` (requires: `app_name`, `region`, `enabled`)
+- `apps.set_router_logs` (requires: `app_name`, `region`, `enabled`)
+- `apps.set_sticky_session` (requires: `app_name`, `region`, `enabled`)
+- `apps.change_project` (requires: `app_name`, `region`, `project_id`)
 
 ## Deployments
 - `deployments.list`
 - `deployments.details` (requires: `deployment_id`)
 - `deployments.output` (requires: `deployment_id`)
-- `deployments.cache_reset` (confirmation required)
+- `deployments.create` (requires: `github_repo` or `source_url`)
+- `deployments.rollback` (requires: `release_id`)
+- `deployments.cache_reset` (destructive, confirmation required)
 
-## Autoscalers
+## Containers and Scaling
+- `containers.list`
+- `containers.scale` (requires: `container_type`, `amount`)
+- `containers.stop` (destructive, confirmation required)
+- `containers.signal` (destructive, confirmation required)
 - `autoscalers.list`
-- `autoscalers.create` (requires: `container_type`, `min_containers`, `max_containers`, `metric`, `target`; confirmation required)
-- `autoscalers.update` (requires: `autoscaler_id`; confirmation required)
-- `autoscalers.delete` (requires: `autoscaler_id`; confirmation required)
+- `autoscalers.create` (requires: `container_type`, `min_containers`, `max_containers`, `metric`, `target`)
+- `autoscalers.update` (requires: `autoscaler_id`)
+- `autoscalers.delete` (destructive, confirmation required)
 
-## Domains
+## Environment and Addons
+- `env_vars.list`
+- `env_vars.set` (requires: `env_name`, `env_value`)
+- `env_vars.unset` (destructive, confirmation required)
+- `addons.list`
+- `addons.add` (requires: `addon_id`)
+- `addons.remove` (destructive, confirmation required)
+
+## Domains, Collaborators, Logging, Notifiers
 - `domains.list`
-- `domains.create` (requires: `domain`; confirmation required)
-- `domains.delete` (requires: `domain`; confirmation required)
-
-## Collaborators
+- `domains.create` (requires: `domain`)
+- `domains.delete` (destructive, confirmation required)
 - `collaborators.list`
-- `collaborators.invite` (requires: `email`; confirmation required)
-- `collaborators.update_role` (requires: `collaborator_id`, `is_limited`; confirmation required)
-- `collaborators.delete` (requires: `collaborator_id`; confirmation required)
-
-## Log Drains
+- `collaborators.invite` (requires: `email`)
+- `collaborators.update_role` (requires: `collaborator_id`, `is_limited`)
+- `collaborators.delete` (destructive, confirmation required)
 - `log_drains.list`
-- `log_drains.create` (requires: `drain_type`; confirmation required)
-- `log_drains.delete` (requires: `drain_id`; confirmation required)
-
-## Notifiers
+- `log_drains.create` (requires: `drain_type`)
+- `log_drains.delete` (destructive, confirmation required)
 - `notifiers.list`
-- `notifiers.create` (requires: `notifier_name`, `platform_id`; confirmation required)
-- `notifiers.update` (requires: `notifier_id`; confirmation required)
-- `notifiers.delete` (requires: `notifier_id`; confirmation required)
-
-## Containers / One-offs
-- `one_off.run` (requires: `command`; confirmation required)
-- `containers.stop` (requires: `container_id`; confirmation required)
-- `containers.signal` (requires: `container_id`, `signal`; confirmation required)
+- `notifiers.create` (requires: `notifier_name`, `platform_id`)
+- `notifiers.update` (requires: `notifier_id`)
+- `notifiers.delete` (destructive, confirmation required)
 
 ## Other
 - `events.list`
@@ -62,10 +70,5 @@ All commands return the stable `ws.v2` envelope:
 - `memory.show`
 - `memory.forget` (requires: `memory_key`)
 - `memory.pin` (requires: `memory_key`)
+- `one_off.run` (requires: `command`)
 - `confirm` (requires: `confirm_token`)
-
-## Examples
-- `"list apps in osc-fr1"` -> `apps.list`
-- `"set force https true for my-app in osc-fr1"` -> `apps.set_force_https`
-- `"create autoscaler web min 1 max 4 metric cpu target 0.7 on my-app in osc-fr1"` -> `autoscalers.create`
-- `"confirm <token>"` -> `confirm`
