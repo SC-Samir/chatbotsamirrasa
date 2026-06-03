@@ -47,10 +47,6 @@ layout: center
     <div class="font-semibold text-white mb-2">25–35 min</div>
     <div class="s-muted">Démo live : lecture de logs, clarification, sécurité et observabilité.</div>
   </div>
-  <div class="s-card s-card-yellow col-span-2">
-    <div class="font-semibold text-white mb-2">35–45 min</div>
-    <div class="s-muted">Ce que j'ai appris : architecture de contrôle, limites réelles et ce qu'il ne faut surtout pas automatiser naïvement.</div>
-  </div>
 </div>
 
 ---
@@ -84,8 +80,8 @@ layout: center
   <div class="flex items-center gap-3 s-card s-card-violet px-4 py-4">
     <span class="text-2xl">🔐</span>
     <div>
-      <div class="font-semibold text-white text-sm">Obsession perso</div>
-      <div class="s-muted text-xs">Faire des démos impressionnantes sans mentir sur les contraintes de prod</div>
+      <div class="font-semibold text-white text-sm">Network (Linkedin, Twitter)</div>
+      <div class="s-muted text-xs">Samir Akarioh/ @SamirAkarioh</div>
     </div>
   </div>
 </div>
@@ -606,8 +602,6 @@ layout: center
 layout: center
 ---
 
-## Conclusion
-
 <div class="max-w-4xl mx-auto mt-10 text-center">
   <div class="text-3xl font-black text-white leading-tight">
     Le jour où une phrase peut modifier votre infrastructure,<br>la question n'est plus seulement <span class="s-accent">« est-ce qu'elle comprend ? »</span>
@@ -617,7 +611,24 @@ layout: center
     La vraie question est :<br><span class="text-white font-semibold">est-ce qu'elle mérite d'être transformée en action ?</span>
   </div>
 
+
+</div>
+
+---
+layout: center
+---
+
+<div class="flex flex-col items-center gap-3">
+  <div class="p-3 bg-white rounded-xl flex items-center justify-center">
+    <img
+      src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=https://github.com/SC-Samir/chatbotsamirrasa"
+      alt="QR Code - Webinaire RAG souverain"
+      class="w-48 h-48"
+    />
+  </div>
+ ChatBot on Github
+</div>
+
   <div class="mt-10 s-card inline-block px-8 py-4">
     Samir Akarioh · <span class="s-accent">Scalingo</span>
   </div>
-</div>
