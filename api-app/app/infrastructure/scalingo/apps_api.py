@@ -13,7 +13,7 @@ from app.application.dto import (
     ScaleResultDTO,
 )
 from app.application.ports import AppManagementGateway
-from app.domain import AppId, ContainerScale, EnvVarInput, FailureReason, OperationError, OperationResult, Region
+from app.domain import AppId, ContainerScale, ErrorCode, EnvVarInput, FailureReason, OperationError, OperationResult, Region
 from app.infrastructure.scalingo.http_client import ScalingoHTTPClient
 
 
@@ -65,6 +65,7 @@ class AppsAPI(AppManagementGateway):
                 OperationError(
                     reason=FailureReason.UPSTREAM,
                     message="Scalingo logs endpoint did not return logs_url",
+                    code=ErrorCode.UPSTREAM_ERROR,
                     status_code=502,
                 )
             )
@@ -147,6 +148,7 @@ class AppsAPI(AppManagementGateway):
                     OperationError(
                         reason=FailureReason.CONFLICT,
                         message="Application is already scaling",
+                        code=ErrorCode.ALREADY_EXISTS,
                         status_code=409,
                         details=result.error.details,
                     )

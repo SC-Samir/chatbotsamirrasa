@@ -1,41 +1,59 @@
 """
-Middleware de logging des requêtes.
+Middleware for logging HTTP requests.
+
+This middleware logs all incoming HTTP requests and their responses,
+including processing time and status codes.
 """
 import time
+from typing import Optional
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from app.core.logging import StructuredLogger
+
+from app.core.logging import StructuredLogger, request_context
 
 logger = StructuredLogger("request_middleware")
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware pour logger les requêtes HTTP."""
+    """Middleware for logging HTTP requests."""
+    
+    def _get_client_ip(self, request: Request) -> Optional[str]:
+        """Extract client IP address from request."""
+        if request.client:
+            return request.client.host
+        # Check for forwarded headers
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        return None
     
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
+        client_ip = self._get_client_ip(request)
         
-        # Log de la requête entrante
+        # Log the incoming request
         logger.info(
-            "Requête entrante",
+            "Request started",
             method=request.method,
             url=str(request.url),
-            client_ip=request.client.host if request.client else None
+            client_ip=client_ip,
         )
         
-        # Traitement de la requête
+        # Process the request
         response = await call_next(request)
         
-        # Calcul du temps de traitement
+        # Calculate processing time
         process_time = time.time() - start_time
         
-        # Log de la réponse
+        # Log the response
         logger.info(
-            "Requête traitée",
+            "Request completed",
             method=request.method,
             url=str(request.url),
             status_code=response.status_code,
-            process_time=f"{process_time:.3f}s"
+            process_time=f"{process_time:.3f}s",
+            client_ip=client_ip,
         )
         
         return response

@@ -23,11 +23,16 @@ from app.application.validators import (
     parse_region,
     parse_scope,
 )
-from app.domain import DomainValidationError, FailureReason, OperationError, OperationResult
+from app.domain import ErrorCode, DomainValidationError, FailureReason, OperationError, OperationResult
 
 
 def _validation_error(message: str) -> OperationError:
-    return OperationError(reason=FailureReason.VALIDATION, message=message, status_code=400)
+    return OperationError(
+        reason=FailureReason.VALIDATION,
+        message=message,
+        code=ErrorCode.VALIDATION_ERROR,
+        status_code=400,
+    )
 
 
 class RestartApp:

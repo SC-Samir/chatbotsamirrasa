@@ -6,7 +6,7 @@ import httpx
 
 from app.config import settings
 from app.core.logging import StructuredLogger
-from app.domain import FailureReason, OperationError, OperationResult
+from app.domain import ErrorCode, FailureReason, OperationError, OperationResult
 from app.domain.value_objects import Region
 from app.infrastructure.scalingo.auth_token_provider import AuthTokenProvider
 
@@ -98,6 +98,7 @@ class ScalingoHTTPClient:
                 OperationError(
                     reason=FailureReason.TRANSIENT,
                     message="Scalingo API request timed out",
+                    code=ErrorCode.TIMEOUT_ERROR,
                     status_code=504,
                 )
             )
@@ -106,6 +107,7 @@ class ScalingoHTTPClient:
                 OperationError(
                     reason=FailureReason.TRANSIENT,
                     message=f"Scalingo API transport error: {str(exc)}",
+                    code=ErrorCode.TRANSIENT_ERROR,
                     status_code=502,
                 )
             )
@@ -114,6 +116,7 @@ class ScalingoHTTPClient:
                 OperationError(
                     reason=FailureReason.TRANSIENT,
                     message=f"Unable to get Scalingo bearer token: {str(exc)}",
+                    code=ErrorCode.AUTH_ERROR,
                     status_code=503,
                 )
             )
@@ -125,22 +128,30 @@ class ScalingoHTTPClient:
 
         if status_code == 401:
             reason = FailureReason.AUTH
+            code = ErrorCode.AUTH_ERROR
         elif status_code == 404:
             reason = FailureReason.NOT_FOUND
+            code = ErrorCode.RESOURCE_NOT_FOUND
         elif status_code == 409:
             reason = FailureReason.CONFLICT
+            code = ErrorCode.RESOURCE_CONFLICT
         elif status_code == 422:
             reason = FailureReason.VALIDATION
+            code = ErrorCode.VALIDATION_ERROR
         elif status_code == 429:
             reason = FailureReason.TRANSIENT
+            code = ErrorCode.TRANSIENT_ERROR
         elif status_code >= 500:
             reason = FailureReason.TRANSIENT
+            code = ErrorCode.SERVICE_UNAVAILABLE
         else:
             reason = FailureReason.UPSTREAM
+            code = ErrorCode.UPSTREAM_ERROR
 
         return OperationError(
             reason=reason,
             message=f"Scalingo API request failed with status {status_code}",
+            code=code,
             status_code=status_code,
             details={"response": body, "request_id": request_id},
         )

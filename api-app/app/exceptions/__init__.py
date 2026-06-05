@@ -1,18 +1,23 @@
 """
-Exceptions personnalisées pour l'application.
+Custom exceptions for the application.
+
+This package contains all custom exception types used throughout the application,
+including domain exceptions and application-specific exceptions.
 """
 from .custom_exceptions import (
-    ScalingoAPIError,
-    LogsServiceError,
-    DeploymentError,
+    BaseAppException,
     ConfigurationError,
-    ValidationError
+    DeploymentError,
+    LogsServiceError,
+    ScalingoAPIError,
+    ValidationError,
 )
 
 __all__ = [
-    "ScalingoAPIError",
-    "LogsServiceError", 
-    "DeploymentError",
+    "BaseAppException",
     "ConfigurationError",
-    "ValidationError"
+    "DeploymentError",
+    "LogsServiceError",
+    "ScalingoAPIError",
+    "ValidationError",
 ]

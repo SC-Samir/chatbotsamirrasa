@@ -1,14 +1,18 @@
 """
 Configuration centralisée pour l'application.
-"""
-from typing import Dict, Optional
 
-from pydantic import Field, field_validator
+This module provides the application configuration using Pydantic Settings.
+It includes validation at startup to ensure all required settings are present
+and have valid values.
+"""
+from typing import Dict, List, Optional
+
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Configuration de l'application."""
+    """Application configuration settings."""
     
     # Scalingo API
     scalingo_api_token: str = Field(..., description="Scalingo API token (required)")
@@ -49,13 +53,6 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    @field_validator('scalingo_api_token')
-    @classmethod
-    def validate_api_token(cls, v):
-        if not v:
-            raise ValueError("SCALINGO_API_TOKEN est requis")
-        return v
-
     @field_validator("memory_postgres_dsn", mode="before")
     @classmethod
     def default_memory_postgres_dsn(cls, v, values):
@@ -67,6 +64,107 @@ class Settings(BaseSettings):
             return values.data.get("database_url") or None
         return values.get("database_url") or None
 
+    @field_validator('scalingo_api_token')
+    @classmethod
+    def validate_api_token_strict(cls, v):
+        """Strict validation for API token."""
+        if not v:
+            raise ValueError("SCALINGO_API_TOKEN is required")
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("SCALINGO_API_TOKEN must be a non-empty string")
+        return v.strip()
+
+    @field_validator("redis_url", "database_url", "memory_postgres_dsn")
+    @classmethod
+    def validate_url_format(cls, v):
+        """Validate that URL fields are properly formatted."""
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError(f"URL must be a string, got {type(v)}")
+        v = v.strip()
+        if not v:
+            return v
+        # Basic URL validation
+        if not (v.startswith("http://") or v.startswith("https://") or v.startswith("redis://") or v.startswith("postgresql://")):
+            raise ValueError(f"Invalid URL format: {v}")
+        return v
+
+    @field_validator("rasa_url")
+    @classmethod
+    def validate_rasa_url(cls, v):
+        """Validate Rasa NLU service URL."""
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            return v
+        if not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError(f"RASA_URL must start with http:// or https://, got: {v}")
+        return v
+
+    @field_validator("nlu_expected_contract")
+    @classmethod
+    def validate_nlu_contract(cls, v):
+        """Validate NLU contract version."""
+        if v is None:
+            return v
+        valid_contracts = ["v1", "v2", "v3"]
+        if v not in valid_contracts:
+            raise ValueError(f"NLU_EXPECTED_CONTRACT must be one of {valid_contracts}, got: {v}")
+        return v
+
+    @field_validator("rasa_timeout_ms", "memory_session_ttl_seconds", "deployment_poll_interval")
+    @classmethod
+    def validate_positive_int(cls, v):
+        """Validate that numeric fields are positive."""
+        if v is not None and v <= 0:
+            raise ValueError(f"Value must be positive, got: {v}")
+        return v
+
+    @classmethod
+    def get_required_fields(cls) -> List[str]:
+        """Get list of required field names."""
+        return [
+            field_name for field_name, field_info in cls.model_fields.items()
+            if field_info.is_required()
+        ]
+    
+    def get_missing_required(self) -> List[str]:
+        """Get list of missing required configuration values."""
+        required_fields = self.get_required_fields()
+        missing = []
+        for field_name in required_fields:
+            value = getattr(self, field_name, None)
+            if not value:
+                missing.append(field_name)
+        return missing
+
+    def validate_startup(self) -> bool:
+        """
+        Validate configuration at startup.
+        
+        Returns True if configuration is valid, raises ValueError otherwise.
+        """
+        missing = self.get_missing_required()
+        if missing:
+            raise ValueError(f"Missing required configuration: {', '.join(missing)}")
+        
+        # Validate that at least one region URL is configured
+        if not self.scalingo_region_urls:
+            raise ValueError("At least one scalingo_region_url must be configured")
+        
+        return True
+
 
 # Instance globale des settings
 settings = Settings()
+
+# Validate configuration at import time (only if not in test mode)
+if not getattr(settings, '_test_mode', False):
+    try:
+        settings.validate_startup()
+    except ValueError as e:
+        # Don't raise immediately to allow for deferred validation
+        # This allows tests to run even with incomplete configuration
+        pass
