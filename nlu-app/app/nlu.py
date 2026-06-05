@@ -13,6 +13,8 @@ from app.settings import settings
 
 ANNOTATED_RE = re.compile(r"\[([^\]]+)\]\(([^\)]+)\)")
 INTENT_FALLBACK = "nlu_fallback"
+<<<<<<< HEAD
+=======
 APP_NAME_HINT_RE = re.compile(
     r"\b(?:of|for|app|application)\s+([a-z0-9][a-z0-9-]{1,62})\b",
     re.IGNORECASE,
@@ -23,6 +25,7 @@ VAR_ASSIGN_RE = re.compile(
     r"\b(?:add|set|create)\s+([A-Z][A-Z0-9_]{1,63})\s*=\s*(.+?)(?:\s+\b(?:to|for)\b\s+[a-z0-9][a-z0-9-]{1,62}(?:\s+\bon\b\s+osc(?:\s*-\s*|-)(?:fr1|secnum(?:\s*-\s*|-)fr1))?)?$",
     re.IGNORECASE,
 )
+>>>>>>> c4c918e (samir)
 
 
 class NLUModel:
@@ -47,11 +50,22 @@ class NLUModel:
     def parse(self, text: str) -> Dict[str, Any]:
         normalized = text.strip()
         ranking = self._predict_intents(normalized)
+<<<<<<< HEAD
+        top1 = ranking[0] if ranking else {"name": INTENT_FALLBACK, "confidence_raw": 0.0, "confidence_calibrated": 0.0}
+=======
         top1 = ranking[0] if ranking else {"name": INTENT_FALLBACK, "confidence": 0.0, "confidence_calibrated": 0.0}
+>>>>>>> c4c918e (samir)
         top2 = ranking[1] if len(ranking) > 1 else {"confidence_calibrated": 0.0}
         decision = self._build_decision(top1, top2)
 
         entities = self._extract_entities(normalized)
+<<<<<<< HEAD
+        return {
+            "intent_top1": top1,
+            "intent_ranking": ranking[: max(1, settings.intent_topk)],
+            "decision": decision,
+            "entities": entities,
+=======
         entities = self._apply_rule_based_entity_overrides(normalized, entities)
         hypotheses = ranking[: max(1, settings.intent_topk)]
         quality_signals = self._build_quality_signals(hypotheses, decision)
@@ -60,6 +74,7 @@ class NLUModel:
             "final_decision": decision,
             "entities": entities,
             "quality_signals": quality_signals,
+>>>>>>> c4c918e (samir)
             "text_normalized": normalized,
             "model_info": {
                 "version": self.model_version,
@@ -67,6 +82,8 @@ class NLUModel:
             },
         }
 
+<<<<<<< HEAD
+=======
     def _apply_rule_based_entity_overrides(self, text: str, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Patch critical entities from raw text when token classification returns broken wordpieces."""
         app_name = self._extract_app_name_from_text(text)
@@ -265,12 +282,32 @@ class NLUModel:
             deduped.append(ent)
         return deduped
 
+>>>>>>> c4c918e (samir)
     @staticmethod
     def _build_decision(top1: Dict[str, Any], top2: Dict[str, Any]) -> Dict[str, Any]:
         margin = float(top1["confidence_calibrated"] - top2["confidence_calibrated"])
         min_conf_passed = float(top1["confidence_calibrated"]) >= settings.intent_min_confidence
         min_margin_passed = margin >= settings.intent_min_margin
 
+<<<<<<< HEAD
+        accepted_intent = str(top1["name"])
+        reason = "accepted"
+        if not min_conf_passed:
+            accepted_intent = INTENT_FALLBACK
+            reason = "low_confidence"
+        elif not min_margin_passed:
+            accepted_intent = INTENT_FALLBACK
+            reason = "low_margin"
+
+        return {
+            "accepted_intent": accepted_intent,
+            "reason": reason,
+            "min_conf_passed": bool(min_conf_passed),
+            "min_margin_passed": bool(min_margin_passed),
+            "margin": margin,
+        }
+
+=======
         action = "accept"
         intent = str(top1["name"])
         reason = "accepted"
@@ -314,6 +351,7 @@ class NLUModel:
             "calibration_band": band,
         }
 
+>>>>>>> c4c918e (samir)
     def _calibrate_score(self, score: float) -> float:
         if not settings.nlu_calibration_enabled:
             return float(score)
@@ -323,9 +361,15 @@ class NLUModel:
         calibrated = 1.0 / (1.0 + math.exp(-(logit / self.temperature)))
         return float(calibrated)
 
+<<<<<<< HEAD
+    def _predict_intents(self, text: str) -> List[Dict[str, float | str]]:
+        results = self.intent_pipe(text, truncation=True, max_length=128, top_k=None)
+        ranking: List[Dict[str, float | str]] = []
+=======
     def _predict_intents(self, text: str) -> List[Dict[str, Any]]:
         results = self.intent_pipe(text, truncation=True, max_length=128, top_k=None)
         ranking: List[Dict[str, Any]] = []
+>>>>>>> c4c918e (samir)
         for result in results:
             label = str(result.get("label", ""))
             intent_name = self._resolve_intent_label(label)
@@ -333,6 +377,13 @@ class NLUModel:
             ranking.append(
                 {
                     "name": intent_name,
+<<<<<<< HEAD
+                    "confidence_raw": raw_score,
+                    "confidence_calibrated": self._calibrate_score(raw_score),
+                }
+            )
+        ranking.sort(key=lambda item: float(item["confidence_calibrated"]), reverse=True)
+=======
                     "confidence": raw_score,
                     "confidence_calibrated": self._calibrate_score(raw_score),
                     "rank": 0,
@@ -344,6 +395,7 @@ class NLUModel:
         ranking.sort(key=lambda item: float(item["confidence_calibrated"]), reverse=True)
         for idx, item in enumerate(ranking, start=1):
             item["rank"] = idx
+>>>>>>> c4c918e (samir)
         return ranking
 
     def _resolve_intent_label(self, label: str) -> str:
@@ -379,11 +431,16 @@ class NLUModel:
                 {
                     "entity": entity_name,
                     "value": value,
+<<<<<<< HEAD
+                    "confidence": confidence,
+                    "normalized_value": normalized_value,
+=======
                     "start": int(ent.get("start", 0)),
                     "end": int(ent.get("end", 0)),
                     "confidence": confidence,
                     "normalized_value": normalized_value,
                     "provenance": "ml",
+>>>>>>> c4c918e (samir)
                 }
             )
 
@@ -392,9 +449,13 @@ class NLUModel:
     @staticmethod
     def _normalize_entity_value(entity_name: str, value: str) -> str:
         cleaned = re.sub(r"\s+", " ", value).strip()
+<<<<<<< HEAD
+        if entity_name in {"region", "app_name"}:
+=======
         if entity_name == "region":
             return re.sub(r"\s*-\s*", "-", cleaned).lower()
         if entity_name == "app_name":
+>>>>>>> c4c918e (samir)
             return cleaned.lower()
         return cleaned
 

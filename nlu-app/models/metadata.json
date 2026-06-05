@@ -27,10 +27,17 @@
     "variable_name",
     "variable_value"
   ],
+<<<<<<< HEAD
+  "base_model": "prajjwal1/bert-tiny",
+  "epochs": 1,
+  "max_length": 128,
+  "num_samples": 207,
+=======
   "base_model": "distilbert-base-multilingual-cased",
   "epochs": 5,
   "max_length": 128,
   "num_samples": 278,
+>>>>>>> c4c918e (samir)
   "known_values": {
     "app_name": [
       "samir-test-francois-ai-trois",
@@ -47,6 +54,11 @@
       "production-api",
       "data-processor",
       "samirpgvector",
+<<<<<<< HEAD
+      "mon-app-test",
+      "frontend-app",
+      "new-service",
+=======
       "payments-core",
       "authz-service",
       "mon-app-test",
@@ -56,6 +68,7 @@
       "new-service",
       "chatbot-api",
       "billing-api",
+>>>>>>> c4c918e (samir)
       "backend-api",
       "api-backend",
       "webapp2024",
@@ -73,6 +86,9 @@
       "https://github.com/Scalingo/sample-node-express",
       "https://github.com/Scalingo/sample-ruby-rails",
       "https://github.com/Scalingo/sample-go-martini",
+<<<<<<< HEAD
+      "https://github.com/company/frontend",
+=======
       "https://github.com/acme/payments-core",
       "https://github.com/acme/authz-service",
       "https://github.com/acme/edge-gateway",
@@ -80,6 +96,7 @@
       "https://github.com/acme/worker-jobs",
       "https://github.com/acme/chatbot-api",
       "https://github.com/acme/billing-api",
+>>>>>>> c4c918e (samir)
       "https://github.com/myorg/frontend",
       "https://github.com/user/pgvector",
       "https://github.com/myorg/backend",
@@ -93,9 +110,12 @@
       "https://github.com/org/auth"
     ],
     "git_ref": [
+<<<<<<< HEAD
+=======
       "release-candidate",
       "release-2026",
       "hotfix-login",
+>>>>>>> c4c918e (samir)
       "production",
       "staging",
       "develop",
@@ -110,9 +130,12 @@
       "web"
     ],
     "n": [
+<<<<<<< HEAD
+=======
       "300",
       "200",
       "150",
+>>>>>>> c4c918e (samir)
       "100",
       "50"
     ],
@@ -127,9 +150,12 @@
       "web"
     ],
     "container_amount": [
+<<<<<<< HEAD
+=======
       "9",
       "8",
       "7",
+>>>>>>> c4c918e (samir)
       "6",
       "5",
       "4",
@@ -144,9 +170,13 @@
       "L"
     ],
     "new_name": [
+<<<<<<< HEAD
+      "frontend-staging",
+=======
       "edge-gateway-prod",
       "frontend-staging",
       "billing-api-v2",
+>>>>>>> c4c918e (samir)
       "test-app-prod",
       "pgvector-prod",
       "notifications",
@@ -154,7 +184,10 @@
       "backend-test",
       "auth-service",
       "webapp-prod",
+<<<<<<< HEAD
+=======
       "jobs-worker",
+>>>>>>> c4c918e (samir)
       "my-new-app",
       "backend-v2",
       "my-app-v2",
@@ -167,11 +200,16 @@
     ],
     "variable_name": [
       "MAX_CONNECTIONS",
+<<<<<<< HEAD
+      "WORKER_COUNT",
+      "DATABASE_URL",
+=======
       "FEATURE_FLAG_X",
       "WORKER_COUNT",
       "DATABASE_URL",
       "RETRY_LIMIT",
       "SENTRY_DSN",
+>>>>>>> c4c918e (samir)
       "SECRET_KEY",
       "JWT_SECRET",
       "REDIS_URL",
@@ -185,20 +223,30 @@
       "PORT"
     ],
     "variable_value": [
+<<<<<<< HEAD
+=======
       "https://examplePublicKey@o0.ingest.sentry.io/0",
+>>>>>>> c4c918e (samir)
       "postgresql://user:pass@host:5432/db",
       "redis://localhost:6379",
       "jwt-secret-key-456",
       "my-secret-key-123",
       "abc123def456",
       "production",
+<<<<<<< HEAD
+=======
       "enabled",
+>>>>>>> c4c918e (samir)
       "true",
       "info",
       "3600",
       "3000",
       "100",
       "30",
+<<<<<<< HEAD
+      "4"
+    ]
+=======
       "5",
       "4"
     ]
@@ -207,5 +255,6 @@
   "language_profile": "fr_en_mixed",
   "calibration": {
     "temperature": 1.0
+>>>>>>> c4c918e (samir)
   }
 }

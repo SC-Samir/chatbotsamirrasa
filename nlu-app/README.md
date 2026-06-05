@@ -1,17 +1,29 @@
 # NLU App (FastAPI + Transformers CPU)
 
+<<<<<<< HEAD
+Service NLU auto-heberge expose en contrat **NLU v2** sur `POST /model/parse`.
+=======
 Service NLU auto-heberge expose en contrat **NLU v3** sur `POST /model/parse`.
+>>>>>>> c4c918e (samir)
 
 ## Variables d'environnement
 
 - `NLU_MODEL_PATH` (defaut `models`)
 - `RASA_AUTH_TOKEN` (optionnel, pour compatibilite avec `api-app`)
 - `NLU_AUTH_TOKEN` (optionnel, alias de `RASA_AUTH_TOKEN`)
+<<<<<<< HEAD
+- `NLU_CONTRACT_VERSION` (defaut `v2`)
+- `NLU_MODEL_VERSION` (ex: `2026-04-29`)
+- `NLU_LANGUAGE_PROFILE` (defaut `fr_en_mixed`)
+- `INTENT_MIN_CONFIDENCE` (defaut `0.6`)
+- `INTENT_MIN_MARGIN` (defaut `0.15`)
+=======
 - `NLU_CONTRACT_VERSION` (defaut `v3`)
 - `NLU_MODEL_VERSION` (ex: `2026-05-04-v3d`)
 - `NLU_LANGUAGE_PROFILE` (defaut `fr_en_mixed`)
 - `INTENT_MIN_CONFIDENCE` (defaut `0.45`)
 - `INTENT_MIN_MARGIN` (defaut `0.08`)
+>>>>>>> c4c918e (samir)
 - `INTENT_TOPK` (defaut `3`)
 - `ENTITY_MIN_CONFIDENCE` (defaut `0.0`)
 - `NLU_CALIBRATION_ENABLED` (defaut `true`)
@@ -66,6 +78,25 @@ docker run --rm -p 5005:8000 -e NLU_MODEL_PATH=models chatbotsamir-nlu
 
 ```json
 {
+<<<<<<< HEAD
+  "intent_top1": {"name": "deploy", "confidence_calibrated": 0.91, "confidence_raw": 0.90},
+  "intent_ranking": [
+    {"name": "deploy", "confidence_calibrated": 0.91, "confidence_raw": 0.90},
+    {"name": "create_and_deploy", "confidence_calibrated": 0.05, "confidence_raw": 0.07},
+    {"name": "show_context", "confidence_calibrated": 0.02, "confidence_raw": 0.03}
+  ],
+  "decision": {
+    "accepted_intent": "deploy",
+    "reason": "accepted",
+    "min_conf_passed": true,
+    "min_margin_passed": true,
+    "margin": 0.86
+  },
+  "entities": [
+    {"entity": "app_name", "value": "my-app", "confidence": 0.99, "normalized_value": "my-app"},
+    {"entity": "region", "value": "osc-fr1", "confidence": 0.99, "normalized_value": "osc-fr1"}
+  ],
+=======
   "hypotheses": [
     {"name": "deploy", "confidence": 0.9, "confidence_calibrated": 0.91, "rank": 1, "rationale_features": {"raw_confidence": 0.9}},
     {"name": "create_and_deploy", "confidence": 0.07, "confidence_calibrated": 0.05, "rank": 2, "rationale_features": {"raw_confidence": 0.07}},
@@ -83,6 +114,7 @@ docker run --rm -p 5005:8000 -e NLU_MODEL_PATH=models chatbotsamir-nlu
     {"entity": "region", "value": "osc-fr1", "start": 17, "end": 24, "confidence": 0.99, "normalized_value": "osc-fr1", "provenance": "ml"}
   ],
   "quality_signals": {"ambiguity_score": 0.14, "ood_likelihood": 0.09, "calibration_band": "high"},
+>>>>>>> c4c918e (samir)
   "text_normalized": "deploy my-app on osc-fr1 from https://github.com/user/repo branch main",
   "model_info": {"version": "2026-04-29", "language_profile": "fr_en_mixed"}
 }
