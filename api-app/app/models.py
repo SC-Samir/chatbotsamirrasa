@@ -2,12 +2,13 @@
 Modèles de données pour l'application.
 """
 from typing import Optional, Dict, Any, List
-try:
-    from pydantic.v1 import BaseModel, validator, Field
-except ImportError:  # pragma: no cover
-    from pydantic import BaseModel, validator, Field
+
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 import re
+
+# For backward compatibility with pydantic v1 validator
+validator = field_validator
 
 
 class Region(str, Enum):
@@ -83,7 +84,7 @@ class DeploymentRequest(BaseModel):
 
 class LogsRequest(BaseModel):
     """Requête de récupération des logs."""
-    app_name: str = Field(..., min_length=3, max_length=30, regex=r'^[a-z0-9-]+$')
+    app_name: str = Field(..., min_length=3, max_length=30, pattern=r'^[a-z0-9-]+$')
     region: Region
     n: int = Field(default=100, ge=1, le=10000)
     filter_param: Optional[str] = Field(None, max_length=100)

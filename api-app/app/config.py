@@ -2,17 +2,16 @@
 Configuration centralisée pour l'application.
 """
 from typing import Dict, Optional
-try:
-    from pydantic.v1 import BaseSettings, validator
-except ImportError:  # pragma: no cover
-    from pydantic import BaseSettings, validator
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Configuration de l'application."""
     
     # Scalingo API
-    scalingo_api_token: str
+    scalingo_api_token: str = Field(..., description="Scalingo API token (required)")
     scalingo_region_urls: Dict[str, str] = {
         "osc-fr1": "https://api.osc-fr1.scalingo.com",
         "osc-secnum-fr1": "https://api.osc-secnum-fr1.scalingo.com"
@@ -44,21 +43,28 @@ class Settings(BaseSettings):
     # Deployment
     deployment_poll_interval: int = 10
     
-    @validator('scalingo_api_token')
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    @field_validator('scalingo_api_token')
+    @classmethod
     def validate_api_token(cls, v):
         if not v:
             raise ValueError("SCALINGO_API_TOKEN est requis")
         return v
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
-    @validator("memory_postgres_dsn", pre=True, always=True)
+    @field_validator("memory_postgres_dsn", mode="before")
+    @classmethod
     def default_memory_postgres_dsn(cls, v, values):
         if v:
             return v
         # Reuse Scalingo Postgres addon URL if dedicated memory DSN is not provided.
+        # In pydantic v2, values is a ValidationInfo object with a data attribute
+        if hasattr(values, 'data'):
+            return values.data.get("database_url") or None
         return values.get("database_url") or None
 
 

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="scalingoGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3d1fc8"/>
+      <stop offset="100%" style="stop-color:#644cd3"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Scalingo Logo - Placeholder -->
+  <g fill="url(#scalingoGradient)">
+    <!-- Stylized "S" shape -->
+    <path d="M20 40 C20 25, 35 15, 55 15 C75 15, 85 30, 85 40 C85 50, 75 60, 55 60 C35 60, 20 50, 20 40 Z" />
+    
+    <!-- Text "Scalingo" -->
+    <text x="95" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="url(#scalingoGradient)">
+      Scalingo
+    </text>
+  </g>
+  
+  <!-- Note: Replace this with the actual Scalingo logo -->
+  <!-- The actual logo can be downloaded from scalingo.com -->
+</svg>

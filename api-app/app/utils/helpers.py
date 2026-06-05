@@ -1,8 +1,12 @@
 """
 Common utility functions.
 """
+import time
 import urllib.parse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
+
+from app.domain import AppId, Region
+from app.infrastructure.scalingo import AppsAPI, ScalingoHTTPClient, build_default_token_provider
 
 
 def build_logs_url(base_url: str, params: Dict[str, Any]) -> str:
@@ -53,12 +57,11 @@ def detect_streaming_intent(text: str) -> bool:
     return "stream" in text.lower() or "streamer" in text.lower()
 
 
-def restart_app_with_polling(scalingo_manager, app_name: str, region: str, scope: list = None, max_wait_time: int = 300, check_interval: int = 10) -> bool:
+def restart_app_with_polling(app_name: str, region: str, scope: Optional[List[str]] = None, max_wait_time: int = 300, check_interval: int = 10) -> bool:
     """
     Restart an application and wait for it to be ready.
     
     Args:
-        scalingo_manager: Instance of ScalingoManager
         app_name: Name of the application
         region: Region of the application
         scope: Array of containers to restart (optional)
@@ -68,57 +71,55 @@ def restart_app_with_polling(scalingo_manager, app_name: str, region: str, scope
     Returns:
         bool: True if restart completed successfully, False otherwise
     """
-    import time
+    # Initialize AppsAPI
+    token_provider = build_default_token_provider()
+    scalingo_http_client = ScalingoHTTPClient(token_provider)
+    apps_api = AppsAPI(scalingo_http_client)
+    
+    region_vo = Region(region)
+    app_id = AppId(app_name)
     
     # Start the restart
-    restart_result = scalingo_manager.restart_app(app_name, region, scope)
+    restart_result = apps_api.restart_app(app_id, region_vo, scope)
     
-    # The Scalingo API returns an empty string for a successful restart
-    # So we consider it a success if we have a response (even empty) and no exception
-    if restart_result is None:
+    # Check if restart was successful
+    if not restart_result.success:
         return False
     
     # Wait a moment for the restart to begin
     time.sleep(2)
     
     # Immediate check to detect very fast restarts
-    app_info = scalingo_manager.get_app_status(app_name, region)
-    if app_info:
-        app_data = app_info.get("app", {})
-        status = app_data.get("status")
+    app_status_result = apps_api.get_app_status(app_id, region_vo)
+    if app_status_result.success and app_status_result.value:
+        app_data = app_status_result.value
+        status = app_data.status
         
         if status == "running":
             # Also check the containers
-            containers_info = scalingo_manager.get_containers_status(app_name, region)
-            if containers_info:
-                containers = containers_info.get("containers", [])
-                # Use the 'state' field from the /ps endpoint
-                containers_running = 0
-                for container in containers:
-                    state = container.get("state", "unknown")
-                    if state == "running":
-                        containers_running += 1
+            containers_result = apps_api.get_containers_status(app_id, region_vo)
+            if containers_result.success and containers_result.value:
+                containers = containers_result.value
+                containers_running = sum(1 for container in containers if container.state == "running")
                 
                 if containers_running > 0:
                     return True
     
     # Poll app and containers state until timeout.
     deadline = time.time() + max_wait_time
-    result = False
     while time.time() < deadline:
-        app_info = scalingo_manager.get_app_status(app_name, region)
-        if app_info:
-            app_data = app_info.get("app", {})
-            status = app_data.get("status")
+        app_status_result = apps_api.get_app_status(app_id, region_vo)
+        if app_status_result.success and app_status_result.value:
+            app_data = app_status_result.value
+            status = app_data.status
 
             if status == "running":
-                containers_info = scalingo_manager.get_containers_status(app_name, region)
-                if containers_info:
-                    containers = containers_info.get("containers", [])
-                    containers_running = sum(1 for container in containers if container.get("state", "unknown") == "running")
+                containers_result = apps_api.get_containers_status(app_id, region_vo)
+                if containers_result.success and containers_result.value:
+                    containers = containers_result.value
+                    containers_running = sum(1 for container in containers if container.state == "running")
                     if containers_running > 0:
-                        result = True
-                        break
+                        return True
         time.sleep(check_interval)
 
-    return result
+    return False

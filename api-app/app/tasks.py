@@ -8,14 +8,21 @@ from celery import Celery
 
 from app.config import settings
 from app.core.logging import StructuredLogger
+from app.domain import AppId, Region
+from app.infrastructure.scalingo import AppsAPI, ScalingoHTTPClient, build_default_token_provider
 from app.models import DeploymentStatus
-from app.scalingo_manager import ScalingoManager
 
 celery_app = Celery("tasks", broker=settings.redis_url)
 
 # Client Redis pour Pub/Sub
 redis_client = redis.from_url(settings.redis_url)
 logger = StructuredLogger("tasks")
+
+
+# Initialize AppsAPI for direct use
+token_provider = build_default_token_provider()
+scalingo_http_client = ScalingoHTTPClient(token_provider)
+apps_api = AppsAPI(scalingo_http_client)
 
 STATUS_PROGRESS = {
     DeploymentStatus.QUEUED: 10,
@@ -80,7 +87,6 @@ def build_deployment_event(
 def poll_deployment_status(app_name: str, region: str, deployment_id: str):
     """Monitors deployment status and publishes structured status updates."""
     channel = f"deployment:{deployment_id}"
-    scalingo = ScalingoManager()
 
     status_messages = {
         DeploymentStatus.QUEUED: f"⏰ Deployment of *{app_name}* queued...",
@@ -99,11 +105,37 @@ def poll_deployment_status(app_name: str, region: str, deployment_id: str):
     heartbeat_interval_seconds = 12.0
 
     while True:
-        deployment_info = scalingo.get_deployment_status(app_name, region, deployment_id)
-        if not deployment_info:
+        # Use AppsAPI directly instead of ScalingoManager
+        result = apps_api.get_deployment_status(app_name, region, deployment_id)
+        
+        if not result.success:
             error_msg = f"❌ Error: Unable to retrieve status for {app_name} (ID: {deployment_id})"
             logger.error(
                 "Unable to retrieve deployment status",
+                app_name=app_name,
+                region=region,
+                deployment_id=deployment_id,
+                error=str(result.error) if result.error else "unknown error",
+            )
+            _publish_to_chat(
+                channel,
+                build_deployment_event(
+                    "deployment_finished",
+                    app_name,
+                    deployment_id,
+                    "status-unavailable",
+                    error_msg,
+                    final=True,
+                    error_kind="status_unavailable",
+                ),
+            )
+            break
+
+        deployment_info = result.value
+        if not deployment_info:
+            error_msg = f"❌ Error: Empty response for {app_name} (ID: {deployment_id})"
+            logger.error(
+                "Empty deployment status response",
                 app_name=app_name,
                 region=region,
                 deployment_id=deployment_id,
@@ -122,7 +154,7 @@ def poll_deployment_status(app_name: str, region: str, deployment_id: str):
             )
             break
 
-        status = deployment_info["deployment"]["status"]
+        status = deployment_info.get("deployment", {}).get("status")
         logger.info(
             "Deployment status polled",
             app_name=app_name,

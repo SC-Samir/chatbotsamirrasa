@@ -1,0 +1,420 @@
+/* Scalingo Theme for Slidev */
+/* This file extends the default Slidev theme with Scalingo's brand identity */
+
+/* Apply to all slides within the presentation */
+.slidev-layout {
+  --scalingo-purple: #3d1fc8;
+  --scalingo-purple-light: #644cd3;
+  --scalingo-blue: #183bee;
+  --scalingo-dark: #0f172b;
+  --scalingo-light: #f8f9ff;
+  --scalingo-text: #1f2933;
+  --scalingo-text-light: #ffffff;
+}
+
+/* ============================================
+   COVER SLIDE
+   ============================================ */
+.slidev-layout .cover {
+  background: linear-gradient(135deg, #3d1fc8, #644cd3);
+  color: var(--scalingo-text-light);
+}
+
+.slidev-layout .cover h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.slidev-layout .cover h2 {
+  font-size: 1.5rem;
+  opacity: 0.95;
+  margin-top: 1rem;
+}
+
+/* Cover slide - logo styling */
+.slidev-layout .cover img {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
+/* ============================================
+   SECTION SLIDES
+   ============================================ */
+.slidev-layout .section {
+  background-color: var(--scalingo-light);
+  border-left: 4px solid var(--scalingo-purple);
+}
+
+.slidev-layout .section h1 {
+  color: var(--scalingo-purple);
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.slidev-layout .section h2 {
+  color: var(--scalingo-blue);
+  font-size: 1.5rem;
+}
+
+/* Gradient section backgrounds */
+.slidev-layout .section[style*="background: linear-gradient"] {
+  border-left: none;
+}
+
+/* ============================================
+   DEFAULT SLIDES
+   ============================================ */
+.slidev-layout .default {
+  background-color: var(--scalingo-text-light);
+  color: var(--scalingo-text);
+}
+
+.slidev-layout .default h1 {
+  color: var(--scalingo-purple);
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+}
+
+.slidev-layout .default h2 {
+  color: var(--scalingo-blue);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.slidev-layout .default h3 {
+  color: var(--scalingo-purple);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* ============================================
+   END SLIDE
+   ============================================ */
+.slidev-layout .end {
+  background: linear-gradient(135deg, #3d1fc8, #644cd3);
+  color: var(--scalingo-text-light);
+  text-align: center;
+}
+
+.slidev-layout .end h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.slidev-layout .end h2 {
+  font-size: 1.75rem;
+  margin-bottom: 2rem;
+}
+
+/* ============================================
+   QUOTE SLIDE
+   ============================================ */
+.slidev-layout .quote {
+  background-color: var(--scalingo-light);
+  color: var(--scalingo-text);
+}
+
+.slidev-layout .quote blockquote {
+  font-size: 1.75rem;
+  font-style: italic;
+  color: var(--scalingo-purple);
+  border-left: 4px solid var(--scalingo-purple);
+  padding-left: 1.5rem;
+  margin: 2rem 0;
+}
+
+.slidev-layout .quote cite {
+  font-size: 0.9rem;
+  color: var(--scalingo-text);
+  opacity: 0.7;
+}
+
+/* ============================================
+   TWO-COLUMNS LAYOUT
+   ============================================ */
+.slidev-layout .two-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.slidev-layout .two-cols::before {
+  content: '';
+  display: table;
+  clear: both;
+}
+
+.slidev-layout .two-cols > div {
+  padding: 0;
+}
+
+/* ============================================
+   IMAGE LAYOUTS
+   ============================================ */
+.slidev-layout .image-left,
+.slidev-layout .image-right {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+.slidev-layout .image-left img,
+.slidev-layout .image-right img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(61, 31, 200, 0.15);
+}
+
+/* ============================================
+   CODE BLOCKS
+   ============================================ */
+.slidev-layout pre {
+  background: rgba(61, 31, 200, 0.05);
+  border-left: 3px solid var(--scalingo-purple);
+  border-radius: 0 8px 8px 0;
+  padding: 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.slidev-layout pre code {
+  background: transparent;
+  padding: 0;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 0.9em;
+}
+
+/* Inline code */
+.slidev-layout code {
+  background: rgba(61, 31, 200, 0.1);
+  color: var(--scalingo-purple);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 0.9em;
+}
+
+/* ============================================
+   LISTS AND BULLETS
+   ============================================ */
+.slidev-layout ul,
+.slidev-layout ol {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.slidev-layout li {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+/* Custom bullet colors */
+.slidev-layout ul > li::marker {
+  color: var(--scalingo-purple);
+  font-size: 1.2em;
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
+.slidev-layout table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9em;
+}
+
+.slidev-layout th,
+.slidev-layout td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.slidev-layout th {
+  background: rgba(61, 31, 200, 0.1);
+  color: var(--scalingo-purple);
+  font-weight: 600;
+}
+
+.slidev-layout tr:hover {
+  background: rgba(61, 31, 200, 0.05);
+}
+
+/* ============================================
+   LINKS
+   ============================================ */
+.slidev-layout a {
+  color: var(--scalingo-purple);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.slidev-layout a:hover {
+  color: var(--scalingo-purple-light);
+  text-decoration: underline;
+}
+
+/* ============================================
+   BORDERS AND DIVIDERS
+   ============================================ */
+.slidev-layout hr {
+  border: none;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--scalingo-purple), transparent);
+  margin: 2rem 0;
+}
+
+/* Colored borders for content sections */
+.slidev-layout .border-l-purple-500 {
+  border-left: 4px solid var(--scalingo-purple);
+}
+
+.slidev-layout .border-l-blue-500 {
+  border-left: 4px solid var(--scalingo-blue);
+}
+
+/* ============================================
+   TEXT UTILITIES
+   ============================================ */
+.slidev-layout .text-purple-600 {
+  color: var(--scalingo-purple);
+}
+
+.slidev-layout .text-blue-600 {
+  color: var(--scalingo-blue);
+}
+
+.slidev-layout .bg-purple-50 {
+  background: rgba(61, 31, 200, 0.1);
+}
+
+.slidev-layout .bg-blue-50 {
+  background: rgba(24, 59, 238, 0.1);
+}
+
+.slidev-layout .bg-indigo-50 {
+  background: rgba(79, 70, 229, 0.1);
+}
+
+/* ============================================
+   GRID LAYOUTS
+   ============================================ */
+.slidev-layout .grid-cols-2,
+.slidev-layout .grid > .grid-cols-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.slidev-layout .grid-cols-3,
+.slidev-layout .grid > .grid-cols-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+/* ============================================
+   CARDS
+   ============================================ */
+.slidev-layout .card {
+  background: var(--scalingo-text-light);
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 2px 8px rgba(61, 31, 200, 0.1);
+  border-left: 4px solid var(--scalingo-purple);
+  margin: 1rem 0;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+/* Smooth transitions for v-click elements */
+.slidev-layout .v-click {
+  transition: all 0.3s ease;
+}
+
+/* Highlight effect for v-click-here */
+.slidev-layout .v-click-here {
+  background: rgba(61, 31, 200, 0.1);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+/* ============================================
+   MERMAID DIAGRAMS
+   ============================================ */
+.slidev-layout .mermaid {
+  background: var(--scalingo-text-light);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid rgba(61, 31, 200, 0.2);
+}
+
+/* ============================================
+   FOOTER (optional - uncomment to use)
+   ============================================ */
+/*
+.slidev-layout .slide-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(61, 31, 200, 0.1);
+  color: var(--scalingo-purple);
+  padding: 8px 16px;
+  font-size: 0.7em;
+  text-align: center;
+  z-index: 100;
+}
+.slidev-layout .slide-footer a {
+  color: var(--scalingo-purple);
+}
+*/
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+@media (max-width: 768px) {
+  .slidev-layout .two-cols,
+  .slidev-layout .image-left,
+  .slidev-layout .image-right {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .slidev-layout .grid-cols-2,
+  .slidev-layout .grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+  
+  .slidev-layout .cover h1 {
+    font-size: 2rem;
+  }
+  
+  .slidev-layout .default h1 {
+    font-size: 1.75rem;
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .slidev-layout .v-click-hidden {
+    display: none !important;
+  }
+  
+  .slidev-layout .v-click {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+}
