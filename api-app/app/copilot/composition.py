@@ -7,6 +7,7 @@ components, including NLU adapter, memory service, gateway, engine, and handlers
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from app.config import settings
 from app.infrastructure.rasa import RasaClient
@@ -17,6 +18,9 @@ from app.copilot.nlu import NLUAdapter
 from app.copilot.orchestration import CommandEngine
 from app.copilot.presentation.ws_v2 import WebSocketV2Presenter
 from app.copilot.scalingo_ops import ScalingoOpsGateway
+from app.core.logging import StructuredLogger
+
+logger = StructuredLogger("copilot_composition")
 
 
 @dataclass(frozen=True)
@@ -37,6 +41,25 @@ def build_copilot_components() -> CopilotComponents:
     gateway = ScalingoOpsGateway(scalingo_client)
 
     memory = build_memory_service()
+    
+    # If memory service is not available, create a stub
+    if memory is None:
+        logger.warning("Memory service not available - using stub")
+        # Create a minimal stub memory service
+        from app.copilot.memory.service import MemoryService
+        class StubMemoryService:
+            def get(self, key: str, default: Any = None) -> Any:
+                return default
+            def set(self, key: str, value: Any) -> None:
+                pass
+            def delete(self, key: str) -> None:
+                pass
+            def get_session(self, session_id: str) -> dict:
+                return {}
+            def save_session(self, session_id: str, data: dict) -> None:
+                pass
+        memory = StubMemoryService()  # type: ignore
+    
     engine = CommandEngine(gateway=gateway, memory=memory)
     presenter = WebSocketV2Presenter()
 

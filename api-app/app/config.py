@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     """Application configuration settings."""
     
     # Scalingo API
-    scalingo_api_token: str = Field(..., description="Scalingo API token (required)")
+    scalingo_api_token: Optional[str] = Field(default=None, description="Scalingo API token")
     scalingo_region_urls: Dict[str, str] = {
         "osc-fr1": "https://api.osc-fr1.scalingo.com",
         "osc-secnum-fr1": "https://api.osc-secnum-fr1.scalingo.com"
@@ -38,6 +38,28 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "ScalingoOps Agent"
     debug: bool = False
+    
+    # API Keys (comma-separated or list)
+    api_keys: Optional[List[str]] = None
+    jwt_secret_key: Optional[str] = None
+    
+    # CORS Configuration
+    cors_origins: List[str] = ["*"]
+    cors_allow_credentials: bool = True
+    cors_allow_methods: List[str] = ["*"]
+    cors_allow_headers: List[str] = ["*"]
+    cors_expose_headers: List[str] = ["X-Request-ID", "X-RateLimit-*", "Retry-After"]
+    cors_max_age: int = 600
+    
+    # Rate Limiting
+    rate_limit_enabled: bool = True
+    rate_limit_max_requests: int = 100
+    rate_limit_window_seconds: int = 60
+    rate_limit_by: str = "ip"  # Can be: "ip", "user", "api_key", "combined"
+    
+    # Security
+    force_https: bool = False
+    allow_insecure: bool = True  # For development
     
     # Logs
     default_log_lines: int = 100
@@ -68,8 +90,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_api_token_strict(cls, v):
         """Strict validation for API token."""
-        if not v:
-            raise ValueError("SCALINGO_API_TOKEN is required")
+        if v is None:
+            return v
         if not isinstance(v, str) or not v.strip():
             raise ValueError("SCALINGO_API_TOKEN must be a non-empty string")
         return v.strip()
@@ -125,10 +147,8 @@ class Settings(BaseSettings):
     @classmethod
     def get_required_fields(cls) -> List[str]:
         """Get list of required field names."""
-        return [
-            field_name for field_name, field_info in cls.model_fields.items()
-            if field_info.is_required()
-        ]
+        # Manually specify which fields are truly required for the application to work
+        return ["scalingo_api_token"]
     
     def get_missing_required(self) -> List[str]:
         """Get list of missing required configuration values."""

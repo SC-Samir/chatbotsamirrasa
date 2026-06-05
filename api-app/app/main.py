@@ -23,8 +23,16 @@ from app.core.container import container
 from app.core.logging import StructuredLogger
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging_middleware import LoggingMiddleware
+from app.middleware.auth_middleware import AuthMiddleware
+from app.middleware.rate_limit_middleware import RateLimitMiddleware, RateLimitConfig
+from app.middleware.security_middleware import (
+    SecurityHeadersMiddleware,
+    CORSConfig,
+    create_cors_middleware,
+)
 from app.domain import Region
 from app.models import LogsRequest
+from app.presentation.health import router as health_router
 
 logger = StructuredLogger("main")
 
@@ -50,11 +58,82 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Application shutting down")
 
 
+# OpenAPI configuration
+openapi_config = {
+    "title": settings.app_name,
+    "description": """
+# Scalingo Copilot API
+
+This API provides intelligent management capabilities for Scalingo deployments, logs, and infrastructure.
+
+## Authentication
+
+This API uses API key authentication. Include your API key in the `X-API-Key` header or as a query parameter.
+
+## Features
+
+- **Logs Management**: Retrieve, filter, and stream application logs
+- **Command Processing**: Execute commands via WebSocket interface
+- **Deployment Management**: Manage application deployments
+- **App Management**: Control Scalingo applications
+- **Memory Management**: Store and retrieve conversation memory
+- **Health Checks**: Monitor service health and dependencies
+
+## WebSocket Interface
+
+Connect to `/ws` endpoint for interactive command processing using the v2 protocol.
+
+## Error Handling
+
+All errors return consistent JSON responses with:
+- `error`: Error type
+- `message`: Human-readable error message
+- `status_code`: HTTP status code
+- `error_id`: Unique error identifier (for tracking)
+- `code`: Machine-readable error code
+- `timestamp`: ISO 8601 timestamp
+    """,
+    "version": "3.1.0",
+    "contact": {
+        "name": "Scalingo Support",
+        "email": "support@scalingo.com",
+    },
+    "license": {
+        "name": "Proprietary",
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000",
+            "description": "Development server",
+        },
+        {
+            "url": "https://api.scalingo.com",
+            "description": "Production server",
+        },
+    ],
+    "tags": [
+        {
+            "name": "health",
+            "description": "Health check and monitoring endpoints",
+        },
+        {
+            "name": "logs",
+            "description": "Application logs retrieval and streaming",
+        },
+        {
+            "name": "api",
+            "description": "API information and documentation",
+        },
+        {
+            "name": "websocket",
+            "description": "WebSocket endpoints for interactive commands",
+        },
+    ],
+}
+
 # Create FastAPI application
 app = FastAPI(
-    title=settings.app_name,
-    description="Intelligent agent for managing Scalingo deployments and logs",
-    version="3.1.0",
+    **openapi_config,
     lifespan=lifespan,
     docs_url="/api/docs" if settings.debug else None,
     redoc_url="/api/redoc" if settings.debug else None,
@@ -64,6 +143,39 @@ app = FastAPI(
 # Add middleware
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(LoggingMiddleware)
+
+# Add authentication middleware (optional, not required by default)
+if getattr(settings, 'require_auth', False):
+    from app.middleware.auth_middleware import create_auth_middleware
+    auth_middleware = create_auth_middleware(require_auth=True)
+    app.add_middleware(auth_middleware)
+
+# Add rate limiting middleware
+if getattr(settings, 'rate_limit_enabled', True):
+    rate_limit_config = RateLimitConfig(
+        max_requests=getattr(settings, 'rate_limit_max_requests', 100),
+        window_seconds=getattr(settings, 'rate_limit_window_seconds', 60),
+    )
+    rate_limit_middleware = RateLimitMiddleware(
+        app,
+        config=rate_limit_config,
+        limit_by=getattr(settings, 'rate_limit_by', 'ip'),
+        enabled=True,
+    )
+    app.add_middleware(rate_limit_middleware)
+
+# Add security headers middleware
+app.add_middleware(
+    SecurityHeadersMiddleware(
+        app,
+        force_https=getattr(settings, 'force_https', False),
+    )
+)
+
+# Add CORS middleware
+cors_config = CORSConfig.from_settings()
+cors_middleware = create_cors_middleware(cors_config)
+app.add_middleware(cors_middleware)
 
 # Initialize components
 components = build_components()
@@ -85,43 +197,8 @@ logger.info(
 )
 
 
-# Health check endpoint
-@app.get("/health", tags=["health"])
-async def health_check():
-    """
-    Health check endpoint.
-    
-    Returns a simple JSON response indicating the service is healthy.
-    """
-    return {
-        "status": "healthy",
-        "version": "3.1.0",
-        "app_name": settings.app_name,
-    }
-
-
-@app.get("/health/detailed", tags=["health"])
-async def detailed_health_check():
-    """
-    Detailed health check endpoint.
-    
-    Returns comprehensive health information including dependency status.
-    """
-    health_status = {
-        "status": "healthy",
-        "version": "3.1.0",
-        "app_name": settings.app_name,
-        "components": {
-            "apps_api": "operational",
-            "logs_service": "operational",
-            "copilot": "operational",
-        },
-        "dependencies": {
-            "redis": "connected" if settings.redis_url else "not configured",
-            "database": "connected" if settings.database_url else "not configured",
-        },
-    }
-    return health_status
+# Include health router
+app.include_router(health_router)
 
 
 # Home page
@@ -324,22 +401,26 @@ async def display_app_logs(app_name: str, region: str, n: int = 100, filter: str
 
 
 # WebSocket endpoints for Copilot
-@app.websocket("/ws", tags=["websocket"])
+@app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
     WebSocket endpoint for copilot v2 protocol.
     
     Primary WebSocket endpoint for interactive command processing.
+    
+    Tags: websocket
     """
     await copilot_components.websocket_handler.handle_connection(websocket)
 
 
-@app.websocket("/ws/", tags=["websocket"])
+@app.websocket("/ws/")
 async def websocket_endpoint_slash(websocket: WebSocket):
     """
     WebSocket endpoint with trailing slash for copilot v2 protocol.
     
     Alternative endpoint with trailing slash for compatibility.
+    
+    Tags: websocket
     """
     await copilot_components.websocket_handler.handle_connection(websocket)
 

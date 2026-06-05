@@ -1,5 +1,5 @@
 """Presentation layer package."""
 
-from .ws_v2 import WebSocketV2Presenter
+from .health import router as health_router
 
-__all__ = ["WebSocketV2Presenter"]
+__all__ = ["health_router"]

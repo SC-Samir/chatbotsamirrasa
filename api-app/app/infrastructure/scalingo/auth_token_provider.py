@@ -11,15 +11,25 @@ logger = StructuredLogger("scalingo_auth")
 
 
 class AuthTokenProvider:
-    def __init__(self, api_token: str, auth_url: str = "https://auth.scalingo.com/v1/tokens/exchange"):
+    def __init__(self, api_token: Optional[str] = None, auth_url: str = "https://auth.scalingo.com/v1/tokens/exchange"):
         if not api_token:
-            raise ValueError("SCALINGO_API_TOKEN is required")
-        self._api_token = api_token
+            # For testing/development, allow None token but it won't work for actual API calls
+            logger.warning("AuthTokenProvider initialized without API token - API calls will fail")
+            self._api_token = None
+        else:
+            self._api_token = api_token
         self._auth_url = auth_url
         self._token: Optional[str] = None
         self._expires_at: float = 0.0
+    
+    @property
+    def has_token(self) -> bool:
+        """Check if provider has a valid API token."""
+        return self._api_token is not None
 
     def get_token(self) -> str:
+        if not self.has_token:
+            raise ValueError("SCALINGO_API_TOKEN is required for API calls")
         if self._token is None or time.time() >= self._expires_at:
             self.refresh()
         return self._token  # type: ignore[return-value]

@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import redis
 
 from app.config import settings
 from app.copilot.memory.postgres_store import PostgresMemoryStore
+from app.core.logging import StructuredLogger
+
+logger = StructuredLogger("memory_service")
 
 
 @dataclass(frozen=True)
@@ -92,11 +95,19 @@ class MemoryService:
             return None
 
 
-def build_memory_service() -> MemoryService:
-    if not settings.memory_postgres_dsn:
-        raise RuntimeError("MEMORY_POSTGRES_DSN or DATABASE_URL is required for ws.v2 memory")
+def build_memory_service() -> Optional[MemoryService]:
+    """
+    Build memory service if PostgreSQL is configured.
+    
+    Returns:
+        MemoryService instance or None if PostgreSQL is not configured
+    """
+    pg_dsn = settings.memory_postgres_dsn or settings.database_url
+    if not pg_dsn:
+        logger.warning("Memory service not initialized - MEMORY_POSTGRES_DSN or DATABASE_URL not configured")
+        return None
     return MemoryService(
         redis_url=settings.redis_url,
-        pg_dsn=settings.memory_postgres_dsn,
+        pg_dsn=pg_dsn,
         session_ttl=settings.memory_session_ttl_seconds,
     )
