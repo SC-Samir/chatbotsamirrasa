@@ -1,11 +1,11 @@
 """
-Command orchestration engine for processing user commands.
+Async command orchestration engine for processing user commands.
 
-This module contains the central command registry and execution engine
+This module contains the async command registry and execution engine
 that processes incoming commands, validates them, and executes the
 corresponding actions against the Scalingo API.
 
-The engine now uses a modular handler system where each command type
+The engine uses a modular handler system where each command type
 has its own handler class, making the code more maintainable and testable.
 """
 from __future__ import annotations
@@ -17,17 +17,22 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from app.copilot.contracts import CommandContext, CommandRequest, CommandResult
 from app.copilot.memory.service import MemoryService
-from app.copilot.orchestration.handlers.base import BaseCommandHandler, CommandHandler, HandlerConfig, HandlerRegistry
+from app.copilot.orchestration.handlers.async_base import (
+    AsyncBaseCommandHandler,
+    AsyncCommandHandler,
+    AsyncHandlerConfig,
+    AsyncHandlerRegistry,
+)
 from app.copilot.scalingo_ops.gateway import ScalingoOpsGateway
 
 
 @dataclass(frozen=True)
-class CommandMetadata:
+class AsyncCommandMetadata:
     """
-    Metadata for a command.
+    Metadata for an async command.
     
     This is a legacy class for backward compatibility. New code should use
-    HandlerConfig from the handlers.base module.
+    AsyncHandlerConfig from the handlers.async_base module.
     """
     required_entities: Tuple[str, ...] = ()
     idempotent: bool = True
@@ -36,20 +41,20 @@ class CommandMetadata:
     is_destructive: bool = False
 
 
-class CommandEngine:
+class AsyncCommandEngine:
     """
-    Main command execution engine.
+    Async command execution engine.
     
     This class is responsible for:
-    - Maintaining a registry of all available commands
+    - Maintaining a registry of all available async commands
     - Validating command requests
-    - Executing the appropriate handler for each command
+    - Executing the appropriate async handler for each command
     - Managing confirmation workflows for destructive actions
     """
     
     def __init__(self, gateway: ScalingoOpsGateway, memory: MemoryService):
         """
-        Initialize the command engine.
+        Initialize the async command engine.
         
         Args:
             gateway: Gateway to Scalingo API operations
@@ -57,10 +62,10 @@ class CommandEngine:
         """
         self.gateway = gateway
         self.memory = memory
-        self.registry = HandlerRegistry()
-        self.metadata: Dict[str, CommandMetadata] = {}
+        self.registry = AsyncHandlerRegistry()
+        self.metadata: Dict[str, AsyncCommandMetadata] = {}
         
-        # Load and register all handlers
+        # Load and register all async handlers
         self._load_handlers()
         
         # Set up legacy metadata for backward compatibility
@@ -68,10 +73,10 @@ class CommandEngine:
     
     def _load_handlers(self) -> None:
         """
-        Discover and register all handler classes from the handlers package.
+        Discover and register all async handler classes from the handlers package.
         
         This method scans the handlers directory and registers any class
-        that has been decorated with the @handler decorator.
+        that has been decorated with the @async_handler decorator.
         """
         from app.copilot.orchestration import handlers
         
@@ -80,39 +85,39 @@ class CommandEngine:
         
         # Import all submodules
         for importer, modname, ispkg in pkgutil.iter_modules(handlers_path):
-            if modname != "__init__" and modname.endswith("_handlers"):
+            if modname != "__init__" and modname.startswith("async_") and modname.endswith("_handlers"):
                 full_modname = f"{handlers.__name__}.{modname}"
                 try:
                     module = importlib.import_module(full_modname)
                     self._register_handlers_from_module(module)
                 except ImportError as e:
                     # Log the error but don't fail - this allows for optional handler modules
-                    print(f"Warning: Could not import handler module {full_modname}: {e}")
+                    print(f"Warning: Could not import async handler module {full_modname}: {e}")
         
         # Also register handlers defined directly in __init__.py
         self._register_handlers_from_module(handlers)
     
     def _register_handlers_from_module(self, module: Any) -> None:
         """
-        Register all handler classes from a module.
+        Register all async handler classes from a module.
         
         Args:
             module: The module to scan for handler classes
         """
         for name in dir(module):
             obj = getattr(module, name)
-            if isinstance(obj, type) and hasattr(obj, "_command_name"):
+            if isinstance(obj, type) and hasattr(obj, "_async_command_name"):
                 self._register_handler_class(obj)
     
-    def _register_handler_class(self, handler_class: Type[BaseCommandHandler]) -> None:
+    def _register_handler_class(self, handler_class: Type[AsyncBaseCommandHandler]) -> None:
         """
-        Register a handler class with the engine.
+        Register an async handler class with the engine.
         
         Args:
-            handler_class: The handler class to register
+            handler_class: The async handler class to register
         """
-        command_name = getattr(handler_class, "_command_name", None)
-        config = getattr(handler_class, "_handler_config", HandlerConfig())
+        command_name = getattr(handler_class, "_async_command_name", None)
+        config = getattr(handler_class, "_async_handler_config", AsyncHandlerConfig())
         
         if not command_name:
             return
@@ -120,11 +125,11 @@ class CommandEngine:
         # Create an instance of the handler
         handler_instance = handler_class(self.gateway, self.memory)
         
-        # Register the handler's handle method
-        self.registry.register(command_name, handler_instance.handle, config)
+        # Register the handler's handle_async method
+        self.registry.register(command_name, handler_instance.handle_async, config)
         
         # Store metadata for backward compatibility
-        self.metadata[command_name] = CommandMetadata(
+        self.metadata[command_name] = AsyncCommandMetadata(
             required_entities=config.required_entities,
             idempotent=config.idempotent,
             requires_app_region=config.requires_app_region,
@@ -172,14 +177,14 @@ class CommandEngine:
         """
         return self.registry.get_all_commands()
     
-    def execute(self, command: str, entities: Dict[str, Any], raw_text: str, context: CommandContext) -> CommandResult:
+    async def execute(self, command: str, entities: Dict[str, Any], raw_text: str, context: CommandContext) -> CommandResult:
         """
-        Execute a command.
+        Execute a command asynchronously.
         
-        This is the main entry point for command execution. It handles:
+        This is the main entry point for async command execution. It handles:
         - Validation of required entities
         - Confirmation workflows for destructive actions
-        - Handler lookup and execution
+        - Async handler lookup and execution
         
         Args:
             command: The command name (e.g., "apps.list")
@@ -203,12 +208,13 @@ class CommandEngine:
             if missing:
                 return self._create_validation_error(command, missing)
         
-        # Get and execute the handler
+        # Get and execute the async handler
         handler = self.registry.get_handler(command)
         if not handler:
             return self._create_unknown_command_error(command)
         
-        return handler(req)
+        # Execute the async handler
+        return await handler(req)
     
     def _require_confirmation(self, command: str, req: CommandRequest) -> CommandResult:
         """
@@ -236,7 +242,7 @@ class CommandEngine:
             risk_level="high",
         )
     
-    def _get_missing_entities(self, config: HandlerConfig, req: CommandRequest) -> Tuple[str, ...]:
+    def _get_missing_entities(self, config: AsyncHandlerConfig, req: CommandRequest) -> Tuple[str, ...]:
         """
         Get a list of missing required entities for a command.
         
@@ -346,7 +352,8 @@ class CommandEngine:
                 return False
         return None
     
-    def _preview_for(self, command: str, req: CommandRequest) -> str:
+    @staticmethod
+    def _preview_for(command: str, req: CommandRequest) -> str:
         """
         Generate a preview string for a command.
         
@@ -359,29 +366,3 @@ class CommandEngine:
         """
         payload = {k: v for k, v in req.entities.items() if k not in {"confirm_token"}}
         return f"{command} with {payload}"
-    
-    def _with_mutation_preview(
-        self,
-        req: CommandRequest,
-        result: CommandResult,
-    ) -> CommandResult:
-        """
-        Add mutation preview to result.
-        
-        Args:
-            req: The command request
-            result: The original result
-            
-        Returns:
-            Result with preview information added
-        """
-        preview = self._preview_for(req.command, req)
-        return CommandResult(
-            event_type=result.event_type,
-            status=result.status,
-            human_message=f"Action preview: {preview}. {result.human_message}",
-            structured_payload={**result.structured_payload, "preview": preview},
-            next_actions=result.next_actions,
-            risk_level=result.risk_level,
-            action_id=result.action_id,
-        )
