@@ -1,4 +1,9 @@
-"""Application composition root."""
+"""
+Application composition root.
+
+This module provides the dependency injection composition for the main
+application components, including HTTP clients, APIs, and services.
+"""
 from dataclasses import dataclass
 
 import httpx

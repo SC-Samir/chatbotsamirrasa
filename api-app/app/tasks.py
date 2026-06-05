@@ -1,3 +1,9 @@
+"""
+Celery background tasks for deployment polling and monitoring.
+
+This module contains asynchronous tasks that run in the background to monitor
+deployment status and publish updates via Redis Pub/Sub.
+"""
 import json
 import time
 from datetime import datetime, timezone
@@ -8,9 +14,8 @@ from celery import Celery
 
 from app.config import settings
 from app.core.logging import StructuredLogger
-from app.domain import AppId, Region
+from app.domain import AppId, DeploymentStatus, Region
 from app.infrastructure.scalingo import AppsAPI, ScalingoHTTPClient, build_default_token_provider
-from app.models import DeploymentStatus
 
 celery_app = Celery("tasks", broker=settings.redis_url)
 

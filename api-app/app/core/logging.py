@@ -1,5 +1,8 @@
 """
 Configuration du système de logging.
+
+Structured logging configuration for the application.
+Provides a StructuredLogger class that formats logs with consistent structure.
 """
 import logging
 import sys

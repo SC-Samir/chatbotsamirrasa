@@ -1,3 +1,9 @@
+"""
+Logs service for retrieving and managing application logs.
+
+This module provides services for fetching logs from Scalingo applications
+and streaming them to clients via WebSocket.
+"""
 from __future__ import annotations
 
 import asyncio

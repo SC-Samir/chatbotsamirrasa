@@ -1,3 +1,10 @@
+"""
+Command orchestration engine for processing user commands.
+
+This module contains the central command registry and execution engine
+that processes incoming commands, validates them, and executes the
+corresponding actions against the Scalingo API.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

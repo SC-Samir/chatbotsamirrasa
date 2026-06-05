@@ -1,3 +1,9 @@
+"""
+PostgreSQL memory store for persistent fact storage.
+
+This module provides durable storage for memory facts and events
+using PostgreSQL as the backend.
+"""
 from __future__ import annotations
 
 import json

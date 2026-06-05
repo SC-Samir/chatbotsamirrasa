@@ -1,3 +1,9 @@
+"""
+WebSocket v2 presentation layer for command results.
+
+This module handles the formatting and emission of command results
+to WebSocket clients in the ws.v2 protocol format.
+"""
 from __future__ import annotations
 
 import uuid

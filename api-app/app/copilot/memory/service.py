@@ -1,3 +1,9 @@
+"""
+Memory service for session and long-term fact storage.
+
+This module provides a hybrid memory service using Redis for short-term
+session storage and PostgreSQL for long-term fact persistence.
+"""
 from __future__ import annotations
 
 import json

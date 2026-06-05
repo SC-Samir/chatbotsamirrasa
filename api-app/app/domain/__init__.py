@@ -1,10 +1,11 @@
 from app.domain.errors import DomainValidationError, FailureReason, OperationError, OperationExecutionError
 from app.domain.result import OperationResult
-from app.domain.value_objects import AppId, ContainerScale, EnvVarInput, Region
+from app.domain.value_objects import AppId, ContainerScale, DeploymentStatus, EnvVarInput, Region
 
 __all__ = [
     "AppId",
     "ContainerScale",
+    "DeploymentStatus",
     "DomainValidationError",
     "EnvVarInput",
     "FailureReason",

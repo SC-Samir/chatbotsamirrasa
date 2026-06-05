@@ -4,50 +4,12 @@ Modèles de données pour l'application.
 from typing import Optional, Dict, Any, List
 
 from pydantic import BaseModel, Field, field_validator
-from enum import Enum
 import re
+
+from app.domain import DeploymentStatus, Region
 
 # For backward compatibility with pydantic v1 validator
 validator = field_validator
-
-
-class Region(str, Enum):
-    """Régions Scalingo supportées."""
-    OSC_FR1 = "osc-fr1"
-    OSC_SECNUM_FR1 = "osc-secnum-fr1"
-
-
-class DeploymentStatus(str, Enum):
-    """Statuts de déploiement Scalingo."""
-    QUEUED = "queued"
-    BUILDING = "building"
-    PUSHING = "pushing"
-    STARTING = "starting"
-    SUCCESS = "success"
-    CRASHED_ERROR = "crashed-error"
-    TIMEOUT_ERROR = "timeout-error"
-    BUILD_ERROR = "build-error"
-    ABORTED = "aborted"
-    
-    @classmethod
-    def is_final_status(cls, status: str) -> bool:
-        """Vérifie si le déploiement a atteint un état final."""
-        return status in [
-            cls.SUCCESS,
-            cls.CRASHED_ERROR,
-            cls.TIMEOUT_ERROR,
-            cls.BUILD_ERROR,
-            cls.ABORTED
-        ]
-    
-    @classmethod
-    def is_error_status(cls, status: str) -> bool:
-        """Vérifie si le statut indique une erreur."""
-        return status in [
-            cls.CRASHED_ERROR,
-            cls.TIMEOUT_ERROR,
-            cls.BUILD_ERROR
-        ]
 
 
 class AppContext(BaseModel):

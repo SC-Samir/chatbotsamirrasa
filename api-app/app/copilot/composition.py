@@ -1,3 +1,9 @@
+"""
+Copilot component composition and dependency wiring.
+
+This module provides the dependency injection composition for the copilot
+components, including NLU adapter, memory service, gateway, engine, and handlers.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

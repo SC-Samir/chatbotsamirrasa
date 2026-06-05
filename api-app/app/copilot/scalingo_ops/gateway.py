@@ -1,3 +1,9 @@
+"""
+Scalingo operations gateway for API interactions.
+
+This module provides a high-level gateway to the Scalingo API,
+encapsulating all the API endpoints used by the copilot commands.
+"""
 from __future__ import annotations
 
 from typing import Any, Dict, Optional

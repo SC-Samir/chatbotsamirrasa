@@ -13,7 +13,8 @@ from app.core.container import container
 from app.core.logging import StructuredLogger
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging_middleware import LoggingMiddleware
-from app.models import LogsRequest, Region
+from app.domain import Region
+from app.models import LogsRequest
 
 logger = StructuredLogger("main")
 

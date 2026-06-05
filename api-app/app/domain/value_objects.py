@@ -15,6 +15,39 @@ class Region(str, Enum):
     OSC_SECNUM_FR1 = "osc-secnum-fr1"
 
 
+class DeploymentStatus(str, Enum):
+    """Statuts de déploiement Scalingo."""
+    QUEUED = "queued"
+    BUILDING = "building"
+    PUSHING = "pushing"
+    STARTING = "starting"
+    SUCCESS = "success"
+    CRASHED_ERROR = "crashed-error"
+    TIMEOUT_ERROR = "timeout-error"
+    BUILD_ERROR = "build-error"
+    ABORTED = "aborted"
+    
+    @classmethod
+    def is_final_status(cls, status: str) -> bool:
+        """Vérifie si le déploiement a atteint un état final."""
+        return status in [
+            cls.SUCCESS,
+            cls.CRASHED_ERROR,
+            cls.TIMEOUT_ERROR,
+            cls.BUILD_ERROR,
+            cls.ABORTED
+        ]
+    
+    @classmethod
+    def is_error_status(cls, status: str) -> bool:
+        """Vérifie si le statut indique une erreur."""
+        return status in [
+            cls.CRASHED_ERROR,
+            cls.TIMEOUT_ERROR,
+            cls.BUILD_ERROR
+        ]
+
+
 @dataclass(frozen=True)
 class AppId:
     value: str

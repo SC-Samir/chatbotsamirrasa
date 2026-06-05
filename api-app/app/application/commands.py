@@ -1,4 +1,9 @@
-"""Use-case command objects."""
+"""
+Use-case command objects.
+
+This module contains command data transfer objects used by the application
+use cases to pass parameters between layers.
+"""
 from dataclasses import dataclass
 from typing import Optional
 

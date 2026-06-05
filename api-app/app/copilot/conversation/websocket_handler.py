@@ -18,9 +18,9 @@ logger = StructuredLogger("ws_v2")
 
 
 INTENT_TO_COMMAND: Dict[str, str] = {
-    # Legacy intent aliases
+    # Intent aliases for backward compatibility
     "deploy": "deployments.create",
-    "create_and_deploy": "legacy.create_and_deploy",
+    "create_and_deploy": "deployments.create",
     "restart": "apps.restart",
     "scale": "containers.scale",
     "delete_app": "apps.delete",

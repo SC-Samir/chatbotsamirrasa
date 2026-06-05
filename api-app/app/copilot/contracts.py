@@ -1,3 +1,9 @@
+"""
+Contracts and data structures for WebSocket v2 protocol.
+
+This module defines the data contracts used for communication between
+the copilot components, including command requests, results, and contexts.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

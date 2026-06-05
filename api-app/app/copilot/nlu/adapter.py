@@ -1,3 +1,9 @@
+"""
+NLU adapter for intent recognition and entity extraction.
+
+This module adapts the Rasa NLU client responses to the internal
+command processing format expected by the orchestration engine.
+"""
 from __future__ import annotations
 
 from typing import Any, Dict, List

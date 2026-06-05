@@ -1,3 +1,9 @@
+"""
+Rasa NLU HTTP client for intent recognition and entity extraction.
+
+This module provides an async client for communicating with the Rasa NLU service
+to parse user messages and extract intents and entities.
+"""
 from __future__ import annotations
 
 import asyncio

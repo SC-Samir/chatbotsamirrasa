@@ -1,5 +1,8 @@
 """
 Conteneur d'injection de dépendances.
+
+Simple dependency injection container for managing singleton
+and transient dependencies throughout the application.
 """
 from typing import TypeVar, Type, Optional, Dict, Any, Callable
 from functools import lru_cache
