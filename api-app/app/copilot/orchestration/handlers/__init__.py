@@ -19,6 +19,10 @@ from .app_handlers import (
     AppSetRouterLogsHandler,
     AppSetStickySessionHandler,
     AppChangeProjectHandler,
+    AppStatsHandler,
+    AppBackupsListHandler,
+    AppBackupsCreateHandler,
+    AppBackupsDownloadHandler,
 )
 
 # Deployment handlers
@@ -110,6 +114,24 @@ from .one_off_handlers import OneOffRunHandler
 # Confirmation handler
 from .confirm_handler import ConfirmHandler
 
+# Region handlers
+from .region_handlers import RegionsListHandler
+
+# Platform handlers
+from .platform_handlers import (
+    ScalingoStatusHandler,
+    BatchExecuteHandler,
+)
+
+# Region handlers
+from .region_handlers import RegionsListHandler
+
+# Platform handlers
+from .platform_handlers import (
+    ScalingoStatusHandler,
+    BatchExecuteHandler,
+)
+
 __all__ = [
     # Base classes
     "BaseCommandHandler",
@@ -128,6 +150,10 @@ __all__ = [
     "AppSetRouterLogsHandler",
     "AppSetStickySessionHandler",
     "AppChangeProjectHandler",
+    "AppStatsHandler",
+    "AppBackupsListHandler",
+    "AppBackupsCreateHandler",
+    "AppBackupsDownloadHandler",
     # Deployment handlers
     "DeploymentCreateHandler",
     "DeploymentDetailsHandler",
@@ -183,4 +209,9 @@ __all__ = [
     "OneOffRunHandler",
     # Confirm handler
     "ConfirmHandler",
+    # Region handlers
+    "RegionsListHandler",
+    # Platform handlers
+    "ScalingoStatusHandler",
+    "BatchExecuteHandler",
 ]

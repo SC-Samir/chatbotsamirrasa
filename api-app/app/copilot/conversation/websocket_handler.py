@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import json
 import re
 import uuid
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from app.core.logging import StructuredLogger
+from app.copilot.conversation.connection_manager import (
+    get_connection_manager,
+    ConnectionStatus,
+    WebSocketVersion,
+)
 from app.copilot.contracts import CommandContext
 from app.copilot.memory.service import MemoryService
 from app.copilot.nlu.adapter import NLUAdapter
@@ -15,6 +22,9 @@ from app.copilot.orchestration.engine import CommandEngine
 from app.copilot.presentation.ws_v2 import WebSocketV2Presenter
 
 logger = StructuredLogger("ws_v2")
+
+# Authentication configuration
+WS_AUTH_TOKEN_HEADER = "x-ws-auth-token"
 
 
 INTENT_TO_COMMAND: Dict[str, str] = {
@@ -78,11 +88,20 @@ INTENT_TO_COMMAND: Dict[str, str] = {
     "add_addon": "addons.add",
     "remove_addon": "addons.remove",
     "confirm": "confirm",
+    # New commands for Phase 4.5
+    "app_stats": "apps.stats",
+    "app_backups": "apps.backups",
+    "create_backup": "apps.backups.create",
+    "download_backup": "apps.backups.download",
+    "list_regions": "regions.list",
+    "scalingo_status": "scalingo.status",
+    "batch_execute": "batch.execute",
 }
 
 SUPPORTED_WS_COMMANDS = {
     "apps.list", "apps.get", "apps.create", "apps.restart", "apps.delete", "apps.rename", "apps.set_force_https",
-    "apps.set_router_logs", "apps.set_sticky_session", "apps.change_project", "deployments.list", "deployments.details",
+    "apps.set_router_logs", "apps.set_sticky_session", "apps.change_project", "apps.stats", "apps.backups",
+    "apps.backups.create", "apps.backups.download", "deployments.list", "deployments.details",
     "deployments.output", "deployments.create", "deployments.rollback", "deployments.cache_reset", "autoscalers.list",
     "autoscalers.create", "autoscalers.update", "autoscalers.delete", "events.list", "domains.list", "domains.create",
     "domains.delete", "collaborators.list", "collaborators.invite", "collaborators.update_role", "collaborators.delete",
@@ -90,6 +109,10 @@ SUPPORTED_WS_COMMANDS = {
     "notifiers.delete", "one_off.run", "containers.list", "containers.scale", "containers.stop", "containers.signal",
     "projects.list", "env_vars.list", "env_vars.set", "env_vars.unset", "addons.list", "addons.add", "addons.remove",
     "memory.show", "memory.forget", "memory.pin", "confirm",
+    # New commands for Phase 4.5
+    "regions.list",
+    "scalingo.status",
+    "batch.execute",
 }
 
 
@@ -99,20 +122,78 @@ class WebSocketV2Handler:
         self.engine = engine
         self.memory = memory
         self.presenter = presenter
+        self._connection_manager = None
+        
+    async def _get_connection_manager(self) -> Any:
+        """Lazy load connection manager."""
+        if self._connection_manager is None:
+            self._connection_manager = await get_connection_manager()
+        return self._connection_manager
 
     async def handle_connection(self, websocket: WebSocket) -> None:
         await websocket.accept()
         session_id = websocket.headers.get("x-session-id") or str(uuid.uuid4())
         user_id = websocket.headers.get("x-user-id") or self._anonymous_user_id(websocket)
+        
+        # Register connection with connection manager
+        connection_manager = await self._get_connection_manager()
+        connection = await connection_manager.register_connection(
+            websocket=websocket,
+            session_id=session_id,
+            user_id=user_id,
+            version=WebSocketVersion.V2,
+        )
+        
+        # Record connection in message history
+        await connection_manager.record_message(
+            connection_id=connection.connection_id,
+            direction="system",
+            message_type="text",
+            content="Connected to Scalingo Copilot ws.v2.",
+            command="system.connect",
+            status="success",
+        )
 
         await self.presenter.emit_system(
             websocket,
             self._msg("Connected to Scalingo Copilot ws.v2.", "Connecte au Copilot Scalingo ws.v2.", "en"),
         )
 
+        # Start ping/pong monitoring in background
+        ping_task = asyncio.create_task(self._ping_pong_monitor(connection.connection_id, websocket))
+
         try:
             while True:
-                text = await websocket.receive_text()
+                # Check for authentication message
+                try:
+                    text = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    # Timeout occurred, continue to check for ping/pong
+                    continue
+                
+                # Handle system commands (ping, pong, auth)
+                if text.strip().lower() == "ping":
+                    await connection_manager.record_pong(connection.connection_id)
+                    await self._handle_ping(websocket, connection.connection_id)
+                    continue
+                elif text.strip().lower() == "pong":
+                    await connection_manager.record_pong(connection.connection_id)
+                    continue
+                elif text.startswith("auth "):
+                    # Handle authentication
+                    await self._handle_authentication(text, websocket, connection.connection_id)
+                    continue
+                
+                # Record incoming message
+                await connection_manager.record_message(
+                    connection_id=connection.connection_id,
+                    direction="in",
+                    message_type="text",
+                    content=text,
+                    command=None,
+                    status="received",
+                )
+                
                 lang = self._detect_lang(text)
                 interpretation = await self.nlu.interpret(text)
 
@@ -318,12 +399,43 @@ class WebSocketV2Handler:
                         action_id=result.action_id,
                     )
                 await self.presenter.emit(websocket, result)
+                
+                # Record outgoing message
+                await connection_manager.record_message(
+                    connection_id=connection.connection_id,
+                    direction="out",
+                    message_type="json",
+                    content=result,
+                    command=command,
+                    status=result.status,
+                )
 
         except WebSocketDisconnect:
-            logger.info("ws.v2 disconnected", session_id=session_id)
+            # Clean up connection on disconnect
+            try:
+                await connection_manager.unregister_connection(connection.connection_id)
+                ping_task.cancel()
+            except Exception:
+                pass
+            logger.info("ws.v2 disconnected", session_id=session_id, connection_id=connection.connection_id)
+        except asyncio.CancelledError:
+            # Handle task cancellation
+            try:
+                await connection_manager.unregister_connection(connection.connection_id)
+            except Exception:
+                pass
+            logger.info("ws.v2 connection cancelled", session_id=session_id, connection_id=connection.connection_id)
         except Exception as exc:
-            logger.error("ws.v2 error", error=str(exc), session_id=session_id)
-            await self.presenter.emit_system(websocket, f"Internal ws.v2 error: {exc}", status="error")
+            # Record error
+            try:
+                await connection_manager.record_error(connection.connection_id, str(exc))
+            except Exception:
+                pass
+            logger.error("ws.v2 error", error=str(exc), session_id=session_id, connection_id=connection.connection_id)
+            try:
+                await self.presenter.emit_system(websocket, f"Internal ws.v2 error: {exc}", status="error")
+            except Exception:
+                pass
 
     def _entities_for_command(self, command: str, merged: Dict[str, object], current: Dict[str, object]) -> Dict[str, object]:
         if command == "confirm":
@@ -407,6 +519,14 @@ class WebSocketV2Handler:
             (r"(?:list|show|get)\s+autoscalers?\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "autoscalers.list", ("app_name", "region")),
             (r"(?:list|show|get)\s+projects?\s+(?:on|in)\s+([a-z0-9-]+)", "projects.list", ("region",)),
             (r"(?:show|get|list)\s+memory\b", "memory.show", ()),
+            # New commands for Phase 4.5
+            (r"(?:show|get)\s+app\s+stats\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.stats", ("app_name", "region")),
+            (r"(?:list|show|get)\s+backups\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.backups", ("app_name", "region")),
+            (r"(?:create|make)\s+backup\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.backups.create", ("app_name", "region")),
+            (r"(?:download|get)\s+backup\s+([A-Za-z0-9-]+)\s+(?:for|of)\s+([a-z0-9-]+)\s+(?:on|in)\s+([a-z0-9-]+)", "apps.backups.download", ("backup_id", "app_name", "region")),
+            (r"(?:list|show|get)\s+regions?\b", "regions.list", ()),
+            (r"(?:show|get|check)\s+scalingo\s+status\b", "scalingo.status", ()),
+            (r"(?:run|execute)\s+batch\s+(?:commands|operations)?\b", "batch.execute", ()),
         ]
         for pattern, command, keys in patterns:
             m = re.search(pattern, s, flags=re.IGNORECASE)
@@ -449,3 +569,100 @@ class WebSocketV2Handler:
     def _anonymous_user_id(websocket: WebSocket) -> str:
         seed = f"{websocket.client.host if websocket.client else 'unknown'}:{websocket.client.port if websocket.client else '0'}"
         return "anon-" + hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
+
+    async def _ping_pong_monitor(self, connection_id: str, websocket: WebSocket) -> None:
+        """Send periodic ping messages to keep connection alive."""
+        connection_manager = await self._get_connection_manager()
+        ping_interval = 20.0  # seconds
+        
+        try:
+            while True:
+                await asyncio.sleep(ping_interval)
+                
+                # Check if connection is still active
+                connection = await connection_manager.get_connection(connection_id)
+                if not connection or connection.status in [ConnectionStatus.DISCONNECTED, ConnectionStatus.ERROR]:
+                    break
+                
+                # Send ping
+                try:
+                    await connection_manager.record_ping(connection_id)
+                    await websocket.send_text("ping")
+                except Exception as e:
+                    logger.warning(
+                        "Failed to send ping",
+                        connection_id=connection_id,
+                        error=str(e),
+                    )
+                    break
+        except asyncio.CancelledError:
+            logger.debug("Ping/pong monitor cancelled", connection_id=connection_id)
+        except Exception as e:
+            logger.error("Ping/pong monitor error", connection_id=connection_id, error=str(e))
+
+    async def _handle_ping(self, websocket: WebSocket, connection_id: str) -> None:
+        """Handle ping message from client."""
+        connection_manager = await self._get_connection_manager()
+        try:
+            await websocket.send_text("pong")
+            await connection_manager.record_pong(connection_id)
+            logger.debug("Received ping, sent pong", connection_id=connection_id)
+        except Exception as e:
+            logger.warning("Failed to send pong", connection_id=connection_id, error=str(e))
+
+    async def _handle_authentication(self, text: str, websocket: WebSocket, connection_id: str) -> None:
+        """Handle authentication message from client."""
+        connection_manager = await self._get_connection_manager()
+        
+        # Extract token from "auth <token>" message
+        parts = text.strip().split(maxsplit=1)
+        if len(parts) < 2:
+            await self.presenter.emit_system(
+                websocket,
+                self._msg(
+                    "Authentication failed: no token provided.",
+                    "Echec de l'authentification: aucun jeton fourni.",
+                    "en",
+                ),
+                status="error",
+            )
+            return
+        
+        token = parts[1].strip()
+        
+        # Validate token and authenticate
+        # In production, you would validate against your authentication service
+        # For now, we'll accept any non-empty token
+        if token:
+            success = await connection_manager.authenticate_connection(connection_id, token)
+            if success:
+                await self.presenter.emit_system(
+                    websocket,
+                    self._msg(
+                        "Authentication successful.",
+                        "Authentification reussie.",
+                        "en",
+                    ),
+                    status="success",
+                )
+                logger.info("WebSocket authenticated", connection_id=connection_id)
+            else:
+                await self.presenter.emit_system(
+                    websocket,
+                    self._msg(
+                        "Authentication failed.",
+                        "Echec de l'authentification.",
+                        "en",
+                    ),
+                    status="error",
+                )
+        else:
+            await self.presenter.emit_system(
+                websocket,
+                self._msg(
+                    "Authentication failed: invalid token.",
+                    "Echec de l'authentification: jeton invalide.",
+                    "en",
+                ),
+                status="error",
+            )

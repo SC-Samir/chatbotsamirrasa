@@ -33,6 +33,7 @@ from app.middleware.security_middleware import (
 from app.domain import Region
 from app.models import LogsRequest
 from app.presentation.health import router as health_router
+from app.presentation.metrics import router as metrics_router
 
 logger = StructuredLogger("main")
 
@@ -199,6 +200,9 @@ logger.info(
 
 # Include health router
 app.include_router(health_router)
+
+# Include metrics router
+app.include_router(metrics_router)
 
 
 # Home page

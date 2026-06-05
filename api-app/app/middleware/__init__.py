@@ -14,6 +14,14 @@ from .security_middleware import (
     create_cors_middleware,
     create_request_validation_middleware,
 )
+from .cache_middleware import (
+    CacheMiddleware,
+    CacheControlMiddleware,
+    cached_endpoint,
+    cache_by_user,
+    cache_by_app,
+    cache_by_path,
+)
 
 __all__ = [
     # Error handling
@@ -34,4 +42,11 @@ __all__ = [
     "create_security_middleware",
     "create_cors_middleware",
     "create_request_validation_middleware",
+    # Caching
+    "CacheMiddleware",
+    "CacheControlMiddleware",
+    "cached_endpoint",
+    "cache_by_user",
+    "cache_by_app",
+    "cache_by_path",
 ]

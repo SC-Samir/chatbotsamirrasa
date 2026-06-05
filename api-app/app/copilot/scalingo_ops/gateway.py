@@ -6,7 +6,8 @@ encapsulating all the API endpoints used by the copilot commands.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+import time
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from app.domain import Region
@@ -241,3 +242,89 @@ class ScalingoOpsGateway:
     def projects_list(self, region: str) -> Dict[str, Any]:
         result = self.client.request("GET", self._region(region), "/v1/projects")
         return result.value if result.success and result.value else {"projects": []}
+
+    def apps_stats(self, app_name: str, region: str) -> Dict[str, Any]:
+        """Get application statistics (CPU, memory, requests, etc.)."""
+        result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/stats")
+        return result.value if result.success and result.value else {"stats": {}}
+
+    def apps_backups_list(self, app_name: str, region: str) -> Dict[str, Any]:
+        """List application backups."""
+        result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/backups")
+        return result.value if result.success and result.value else {"backups": []}
+
+    def apps_backups_create(self, app_name: str, region: str) -> Dict[str, Any]:
+        """Create a new backup of the application."""
+        result = self.client.request("POST", self._region(region), f"/v1/apps/{app_name}/backups")
+        return result.value if result.success and result.value else {"accepted": result.success}
+
+    def apps_backups_download(self, app_name: str, region: str, backup_id: str) -> Dict[str, Any]:
+        """Get download URL for a backup."""
+        result = self.client.request("GET", self._region(region), f"/v1/apps/{app_name}/backups/{backup_id}")
+        return result.value if result.success and result.value else {}
+
+    def regions_list(self) -> Dict[str, Any]:
+        """List all available regions."""
+        # This is a static list for now as Scalingo doesn't have a regions API endpoint
+        # In production, this might come from configuration or a dedicated endpoint
+        regions = [
+            {"name": "par", "display_name": "Paris, FR", "country": "France"},
+            {"name": "osc", "display_name": "Oslo, NO", "country": "Norway"},
+            {"name": "oci", "display_name": "Oracle Cloud", "country": "Global"},
+        ]
+        return {"regions": regions}
+
+    def scalingo_status(self) -> Dict[str, Any]:
+        """Get Scalingo platform status."""
+        # This would typically call a status endpoint if available
+        # For now, return platform info
+        return {
+            "status": "operational",
+            "version": "1.0.0",
+            "regions": ["par", "osc", "oci"],
+            "timestamp": int(time.time()),
+        }
+
+    def batch_execute(self, commands: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Execute multiple commands in batch."""
+        results = []
+        for cmd in commands:
+            command_type = cmd.get("type")
+            entities = cmd.get("entities", {})
+            
+            # Dispatch to appropriate method based on command type
+            try:
+                if command_type == "apps.create":
+                    result = self.apps_create(
+                        entities.get("app_name", ""),
+                        entities.get("region", ""),
+                    )
+                elif command_type == "apps.delete":
+                    result = self.apps_delete(
+                        entities.get("app_name", ""),
+                        entities.get("region", ""),
+                    )
+                elif command_type == "deployments.create":
+                    result = self.deployments_create(
+                        entities.get("app_name", ""),
+                        entities.get("region", ""),
+                        entities.get("source_url", ""),
+                        entities.get("github_repo", ""),
+                        entities.get("git_ref", "main"),
+                    )
+                else:
+                    result = {"error": "Unknown command type"}
+                
+                results.append({
+                    "command": command_type,
+                    "success": True,
+                    "result": result,
+                })
+            except Exception as e:
+                results.append({
+                    "command": command_type,
+                    "success": False,
+                    "error": str(e),
+                })
+        
+        return {"batch_results": results, "total": len(results), "successful": sum(1 for r in results if r.get("success"))}

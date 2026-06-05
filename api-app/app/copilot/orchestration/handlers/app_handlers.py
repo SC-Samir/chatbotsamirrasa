@@ -233,3 +233,73 @@ class AppChangeProjectHandler(BaseCommandHandler):
             request,
             CommandResult("apps.change_project", "success", "Application project updated", payload),
         )
+
+
+@handler(
+    "apps.stats",
+    HandlerConfig(
+        requires_app_region=True,
+        is_mutating=False,
+    ),
+)
+class AppStatsHandler(BaseCommandHandler):
+    """Handler for getting application statistics."""
+
+    def handle(self, request: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(request)
+        payload = self.gateway.apps_stats(app_name, region)
+        return CommandResult("apps.stats", "success", "Application statistics loaded", payload)
+
+
+@handler(
+    "apps.backups",
+    HandlerConfig(
+        requires_app_region=True,
+        is_mutating=False,
+    ),
+)
+class AppBackupsListHandler(BaseCommandHandler):
+    """Handler for listing application backups."""
+
+    def handle(self, request: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(request)
+        payload = self.gateway.apps_backups_list(app_name, region)
+        return CommandResult("apps.backups", "success", "Application backups loaded", payload)
+
+
+@handler(
+    "apps.backups.create",
+    HandlerConfig(
+        requires_app_region=True,
+        idempotent=False,
+        is_mutating=True,
+    ),
+)
+class AppBackupsCreateHandler(BaseCommandHandler):
+    """Handler for creating a new backup."""
+
+    def handle(self, request: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(request)
+        payload = self.gateway.apps_backups_create(app_name, region)
+        return self._with_mutation_preview(
+            request,
+            CommandResult("apps.backups.create", "success", "Backup creation requested", payload),
+        )
+
+
+@handler(
+    "apps.backups.download",
+    HandlerConfig(
+        required_entities=("backup_id",),
+        requires_app_region=True,
+        is_mutating=False,
+    ),
+)
+class AppBackupsDownloadHandler(BaseCommandHandler):
+    """Handler for getting backup download URL."""
+
+    def handle(self, request: CommandRequest) -> CommandResult:
+        app_name, region = self._resolve_app_region(request)
+        backup_id = str(request.entities.get("backup_id") or "")
+        payload = self.gateway.apps_backups_download(app_name, region, backup_id)
+        return CommandResult("apps.backups.download", "success", "Backup download URL retrieved", payload)
