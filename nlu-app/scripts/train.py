@@ -3,10 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-<<<<<<< HEAD
-=======
 import random
->>>>>>> c4c918e (samir)
 import shutil
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -176,22 +173,15 @@ def train_intent_model(dataset: Dataset, output_dir: str, epochs: int, max_lengt
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
         num_train_epochs=epochs,
-<<<<<<< HEAD
-        learning_rate=2e-5,
-=======
         learning_rate=3e-5,
         weight_decay=0.01,
         warmup_ratio=0.1,
->>>>>>> c4c918e (samir)
         logging_steps=10,
         save_strategy="no",
         eval_strategy="epoch",
         report_to=[],
         dataloader_num_workers=0,
-<<<<<<< HEAD
-=======
         seed=42,
->>>>>>> c4c918e (samir)
     )
 
     trainer = Trainer(
@@ -220,17 +210,11 @@ def train_ner_model(samples: List[Dict[str, Any]], output_dir: str, epochs: int,
         label2id=label2id,
     )
 
-<<<<<<< HEAD
-    pivot = int(max(1, len(samples) * 0.8))
-    train_samples = samples[:pivot]
-    eval_samples = samples[pivot:] or samples[:1]
-=======
     shuffled_samples = samples[:]
     random.Random(42).shuffle(shuffled_samples)
     pivot = int(max(1, len(shuffled_samples) * 0.8))
     train_samples = shuffled_samples[:pivot]
     eval_samples = shuffled_samples[pivot:] or shuffled_samples[:1]
->>>>>>> c4c918e (samir)
     tokenized_train_dataset = prepare_ner_dataset(train_samples, tokenizer, label2id, max_length)
     tokenized_eval_dataset = prepare_ner_dataset(eval_samples, tokenizer, label2id, max_length)
 
@@ -239,22 +223,15 @@ def train_ner_model(samples: List[Dict[str, Any]], output_dir: str, epochs: int,
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
         num_train_epochs=epochs,
-<<<<<<< HEAD
-        learning_rate=2e-5,
-=======
         learning_rate=3e-5,
         weight_decay=0.01,
         warmup_ratio=0.1,
->>>>>>> c4c918e (samir)
         logging_steps=10,
         save_strategy="no",
         eval_strategy="epoch",
         report_to=[],
         dataloader_num_workers=0,
-<<<<<<< HEAD
-=======
         seed=42,
->>>>>>> c4c918e (samir)
     )
 
     trainer = Trainer(
@@ -276,19 +253,12 @@ def main() -> None:
     parser.add_argument("--output", default="models", help="Path to output model directory")
     parser.add_argument("--epochs", type=int, default=3, help="Number of training epochs")
     parser.add_argument("--max-length", type=int, default=128, help="Maximum sequence length")
-<<<<<<< HEAD
-    parser.add_argument("--base-model", default="prajjwal1/bert-tiny", help="HF base model for fine-tuning")
-    parser.add_argument("--model-version", default="dev", help="Model version saved in metadata")
-    parser.add_argument("--language-profile", default="fr_en_mixed", help="Language profile in metadata")
-    parser.add_argument("--report-dir", default="reports", help="Training report output directory")
-=======
     parser.add_argument("--base-model", default="xlm-roberta-base", help="HF base model for fine-tuning")
     parser.add_argument("--model-version", default="dev", help="Model version saved in metadata")
     parser.add_argument("--language-profile", default="fr_en_mixed", help="Language profile in metadata")
     parser.add_argument("--report-dir", default="reports", help="Training report output directory")
     parser.add_argument("--min-intent-macro-f1", type=float, default=0.80, help="Fail training if intent macro-f1 is below this threshold")
     parser.add_argument("--min-ner-token-accuracy", type=float, default=0.90, help="Fail training if NER token accuracy is below this threshold")
->>>>>>> c4c918e (samir)
     args = parser.parse_args()
 
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -347,11 +317,6 @@ def main() -> None:
         "model_version": args.model_version,
         "language_profile": args.language_profile,
     }
-<<<<<<< HEAD
-    with open(f"{args.report_dir}/training_report.json", "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2)
-
-=======
 
     intent_macro_f1 = float(intent_metrics.get("eval_macro_f1", intent_metrics.get("macro_f1", 0.0)))
     ner_token_accuracy = float(ner_metrics.get("eval_token_accuracy", ner_metrics.get("token_accuracy", 0.0)))
@@ -376,7 +341,6 @@ def main() -> None:
     if failed:
         raise SystemExit("Quality gate failure: " + "; ".join(failed))
 
->>>>>>> c4c918e (samir)
     print(f"Model saved to {args.output} with {len(samples)} samples")
 
 
